@@ -271,7 +271,7 @@ jobs:
                   return default
 
           def call_groq(prompt, schema, temperature=0.6, max_tokens=4200):
-              nonlocal api_calls
+              global api_calls
 
               if api_calls >= MAX_API_CALLS:
                   raise RuntimeError("Internal API-call budget exhausted.")
