@@ -25,36 +25,21 @@ jobs:
           api_key = os.environ["GROQ_API_KEY"]
 
           prompt = """
-          Create one original faceless YouTube video package.
-
-          Topic:
-          Pick one surprising evergreen fact/topic with broad worldwide appeal.
+          Create one original faceless YouTube video package about one surprising,
+          evergreen topic with broad worldwide appeal.
 
           Requirements:
           - Strong curiosity hook.
-          - 700-900 words of narration.
-          - Natural voice-over language.
-          - No "hey guys" or filler.
-          - 8-12 numbered visual scenes.
-          - Each scene needs narration and a visual description.
-          - Compelling YouTube title.
-          - YouTube description.
-          - Return ONLY valid JSON.
+          - Natural narration suitable for AI voice.
+          - About 700-900 words of narration.
+          - No "hey guys" and no filler.
+          - Create 8-12 numbered visual scenes.
+          - Every scene needs narration and a visual description.
+          - Create a compelling YouTube title.
+          - Create a YouTube description.
+          - Keep the content advertiser-friendly and broadly suitable for YouTube.
 
-          JSON structure:
-          {
-            "topic": "string",
-            "title": "string",
-            "description": "string",
-            "script": "string",
-            "scenes": [
-              {
-                "scene": 1,
-                "narration": "string",
-                "visual": "string"
-              }
-            ]
-          }
+          Return the requested structured fields only.
           """
 
           payload = {
@@ -65,11 +50,64 @@ jobs:
                       "content": prompt
                   }
               ],
-              "max_completion_tokens": 5000,
+              "reasoning_effort": "low",
+              "reasoning_format": "hidden",
               "temperature": 0.7,
-              "include_reasoning": False,
+              "max_completion_tokens": 5000,
               "response_format": {
-                  "type": "json_object"
+                  "type": "json_schema",
+                  "json_schema": {
+                      "name": "youtube_package",
+                      "strict": True,
+                      "schema": {
+                          "type": "object",
+                          "properties": {
+                              "topic": {
+                                  "type": "string"
+                              },
+                              "title": {
+                                  "type": "string"
+                              },
+                              "description": {
+                                  "type": "string"
+                              },
+                              "script": {
+                                  "type": "string"
+                              },
+                              "scenes": {
+                                  "type": "array",
+                                  "items": {
+                                      "type": "object",
+                                      "properties": {
+                                          "scene": {
+                                              "type": "integer"
+                                          },
+                                          "narration": {
+                                              "type": "string"
+                                          },
+                                          "visual": {
+                                              "type": "string"
+                                          }
+                                      },
+                                      "required": [
+                                          "scene",
+                                          "narration",
+                                          "visual"
+                                      ],
+                                      "additionalProperties": False
+                                  }
+                              }
+                          },
+                          "required": [
+                              "topic",
+                              "title",
+                              "description",
+                              "script",
+                              "scenes"
+                          ],
+                          "additionalProperties": False
+                      }
+                  }
               }
           }
 
@@ -88,12 +126,11 @@ jobs:
               with urllib.request.urlopen(request, timeout=180) as response:
                   result = json.loads(response.read().decode("utf-8"))
           except urllib.error.HTTPError as e:
-              print("HTTP ERROR:", e.code)
-              print(e.read().decode("utf-8"))
+              print(f"HTTP ERROR: {e.code}")
+              print(e.read().decode("utf-8", errors="replace"))
               raise
 
-          message = result["choices"][0]["message"]
-          content = message.get("content", "")
+          content = result["choices"][0]["message"].get("content", "")
 
           if not content:
               raise RuntimeError("Groq returned empty content.")
@@ -108,10 +145,9 @@ jobs:
               "scenes"
           ]
 
-          missing = [x for x in required if x not in data]
-
-          if missing:
-              raise RuntimeError(f"Missing fields: {missing}")
+          for key in required:
+              if key not in data:
+                  raise RuntimeError(f"Missing required field: {key}")
 
           with open("output/content.json", "w", encoding="utf-8") as f:
               json.dump(data, f, ensure_ascii=False, indent=2)
@@ -135,7 +171,6 @@ jobs:
           print("Topic:", data["topic"])
           print("Title:", data["title"])
           print("Scenes:", len(data["scenes"]))
-
           PY
 
       - name: Upload generated content
