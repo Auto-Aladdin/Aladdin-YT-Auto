@@ -1,0 +1,25 @@
+name: Faceless YouTube Agent
+
+on:
+  workflow_dispatch:
+
+jobs:
+  test:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check runner
+        run: |
+          echo "✅ GitHub Actions is working!"
+          echo
+          echo "CPU:"
+          nproc
+          echo
+          echo "RAM:"
+          free -h
+          echo
+          echo "Disk:"
+          df -h /
+          echo
+          echo "OS:"
+          lsb_release -a 2>/dev/null || cat /etc/os-release
