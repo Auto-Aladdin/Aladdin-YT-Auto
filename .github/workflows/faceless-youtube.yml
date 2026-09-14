@@ -1,141 +1,45 @@
-name: Faceless YouTube Agent
+name: Groq AI Diagnostic
 
 on:
   workflow_dispatch:
 
 jobs:
-  generate-content:
+  test-groq:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Generate YouTube content with Groq
+      - name: Test Groq model access
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          set -euo pipefail
+          set -u
 
-          mkdir -p output
+          echo "Testing Groq model access..."
 
-          python3 - <<'PY'
-          import json
-          import os
-          import urllib.request
-
-          api_key = os.environ["GROQ_API_KEY"]
-
-          prompt = """
-          Create one original faceless YouTube video package.
-
-          Niche:
-          General-interest curiosity / surprising facts.
-
-          Requirements:
-          - Pick ONE strong topic with broad appeal.
-          - Create a curiosity-driven title.
-          - Write a narration script of about 900-1200 words.
-          - The script must be suitable for AI voice narration.
-          - No greetings like "hey guys".
-          - No claims that require dangerous or unverifiable instructions.
-          - Make the hook strong in the first 10 seconds.
-          - Break the script into numbered visual scenes.
-          - For every scene, provide a short visual description.
-          - Also provide a YouTube description.
-          - Return ONLY valid JSON.
-
-          JSON format:
-          {
-            "topic": "...",
-            "title": "...",
-            "description": "...",
-            "script": "...",
-            "scenes": [
-              {
-                "scene": 1,
-                "narration": "...",
-                "visual": "..."
-              }
-            ]
-          }
-          """
-
-          payload = {
+          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
+            https://api.groq.com/openai/v1/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${GROQ_API_KEY}" \
+            -d '{
               "model": "openai/gpt-oss-20b",
               "messages": [
-                  {
-                      "role": "system",
-                      "content": "You are a professional YouTube content writer. Output valid JSON only."
-                  },
-                  {
-                      "role": "user",
-                      "content": prompt
-                  }
+                {
+                  "role": "user",
+                  "content": "Write exactly one short sentence saying hello."
+                }
               ],
-              "temperature": 0.7,
-              "max_tokens": 5000
-          }
+              "max_tokens": 100
+            }')
 
-          request = urllib.request.Request(
-              "https://api.groq.com/openai/v1/chat/completions",
-              data=json.dumps(payload).encode("utf-8"),
-              headers={
-                  "Content-Type": "application/json",
-                  "Authorization": f"Bearer {api_key}",
-              },
-              method="POST",
-          )
-
-          with urllib.request.urlopen(request, timeout=120) as response:
-              data = json.loads(response.read().decode("utf-8"))
-
-          content = data["choices"][0]["message"]["content"]
-
-          if not content:
-              raise RuntimeError("Groq returned empty content.")
-
-          # Remove accidental markdown fences.
-          content = content.strip()
-          if content.startswith("```"):
-              content = content.replace("```json", "", 1).replace("```", "", 1).strip()
-
-          parsed = json.loads(content)
-
-          with open("output/content.json", "w", encoding="utf-8") as f:
-              json.dump(parsed, f, ensure_ascii=False, indent=2)
-
-          with open("output/topic.txt", "w", encoding="utf-8") as f:
-              f.write(parsed["topic"])
-
-          with open("output/title.txt", "w", encoding="utf-8") as f:
-              f.write(parsed["title"])
-
-          with open("output/description.txt", "w", encoding="utf-8") as f:
-              f.write(parsed["description"])
-
-          with open("output/script.txt", "w", encoding="utf-8") as f:
-              f.write(parsed["script"])
-
-          with open("output/scenes.json", "w", encoding="utf-8") as f:
-              json.dump(parsed["scenes"], f, ensure_ascii=False, indent=2)
-
-          print("✅ AI content generated successfully.")
-          print("Topic:", parsed["topic"])
-          print("Title:", parsed["title"])
-          PY
-
-      - name: Show generated files
-        run: |
-          echo "===== TITLE ====="
-          cat output/title.txt
           echo
-          echo "===== TOPIC ====="
-          cat output/topic.txt
+          echo "HTTP STATUS: ${HTTP_CODE}"
+          echo "RESPONSE:"
+          cat response.json
           echo
-          echo "===== FILES ====="
-          ls -lh output
 
-      - name: Upload generated content
-        uses: actions/upload-artifact@v4
-        with:
-          name: youtube-content
-          path: output/
-          retention-days: 7
+          if [ "$HTTP_CODE" != "200" ]; then
+            echo "❌ Groq request failed."
+            exit 1
+          fi
+
+          echo "✅ Groq request succeeded."
