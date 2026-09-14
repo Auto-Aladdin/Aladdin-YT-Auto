@@ -3,39 +3,179 @@ name: AI Short Story Generator
 on:
   workflow_dispatch:
 
+permissions:
+  contents: write
+
 jobs:
   generate-story:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Generate original 60-second story
+      - name: Checkout repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate original cinematic story
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           set -euo pipefail
 
-          mkdir -p output
+          mkdir -p output .github/data
 
           python3 - <<'PY'
+          import hashlib
           import json
           import os
+          import random
+          import time
           import urllib.error
           import urllib.request
 
           API_URL = "https://api.groq.com/openai/v1/chat/completions"
           TARGET_SECONDS = 58
+          HISTORY_FILE = ".github/data/story_history.json"
 
           api_key = os.environ["GROQ_API_KEY"]
+          rng = random.SystemRandom()
+
+          story_modes = [
+              "quiet human drama",
+              "unexpected kindness",
+              "second chance",
+              "small sacrifice with a big consequence",
+              "regret and reconciliation",
+              "ordinary person facing an impossible choice",
+              "misunderstanding that becomes meaningful",
+              "quiet perseverance after failure",
+              "a promise that is almost broken",
+              "an unexpected act of courage",
+              "a small decision that changes two lives",
+              "an overlooked person finally being seen",
+              "a lost item that reveals an important truth",
+              "a difficult goodbye",
+              "a reunion after years apart",
+              "a stranger helping at exactly the right moment"
+          ]
+
+          primary_emotions = [
+              "warmth",
+              "hope",
+              "regret",
+              "relief",
+              "wonder",
+              "gratitude",
+              "sadness turning into comfort",
+              "quiet joy",
+              "fear turning into courage",
+              "belonging",
+              "forgiveness",
+              "surprise"
+          ]
+
+          hook_styles = [
+              "start at the most intriguing moment",
+              "start with a specific time or place",
+              "start with a surprising action",
+              "start with a question that raises a concrete mystery",
+              "start with a consequence before explaining its cause",
+              "start with one unusual object and why it matters",
+              "start with a promise that seems impossible"
+          ]
+
+          settings = [
+              "a nearly empty bus station before sunrise",
+              "a small neighborhood repair shop",
+              "a rainy apartment building hallway",
+              "a late-night grocery store",
+              "a quiet public library",
+              "a crowded train platform",
+              "a small roadside restaurant",
+              "a school corridor after closing time",
+              "a modest flower shop",
+              "a community clinic waiting room",
+              "a laundromat on a cold evening",
+              "a tiny apartment above a busy street",
+              "a corner bakery before opening",
+              "a local market just before closing",
+              "a parking lot during a summer storm",
+              "a small town post office"
+          ]
+
+          conflict_types = [
+              "a missed opportunity",
+              "a financial problem that must be hidden",
+              "a lost item with emotional value",
+              "an important message that never arrived",
+              "a promise made to someone who is no longer around",
+              "a difficult decision between pride and kindness",
+              "a misunderstanding that risks a relationship",
+              "a person trying one last time after repeated failure",
+              "someone quietly helping another person without being noticed",
+              "a deadline that seems impossible to meet",
+              "a goodbye that neither person is ready for",
+              "a small mistake with unexpectedly large consequences"
+          ]
+
+          twist_types = [
+              "the person who seemed unimportant was the key to the solution",
+              "the object everyone ignored carried the real emotional meaning",
+              "the protagonist discovers they misunderstood what the other person needed",
+              "an earlier small kindness quietly comes back at the perfect moment",
+              "the apparent failure turns out to prevent a worse outcome",
+              "the person receiving help had already helped the protagonist once",
+              "the protagonist gives up something small to restore something much more important",
+              "the final detail changes how the opening scene is understood"
+          ]
+
+          endings = [
+              "a quiet emotional realization",
+              "a single visual callback to the opening moment",
+              "a brief line that reinterprets the whole story",
+              "a small action instead of a speech",
+              "an earned moment of relief",
+              "an understated act of forgiveness",
+              "a hopeful but believable final image"
+          ]
+
+          brief = {
+              "story_mode": rng.choice(story_modes),
+              "primary_emotion": rng.choice(primary_emotions),
+              "hook_style": rng.choice(hook_styles),
+              "setting": rng.choice(settings),
+              "conflict": rng.choice(conflict_types),
+              "twist": rng.choice(twist_types),
+              "ending": rng.choice(endings),
+          }
+
+          if os.path.exists(HISTORY_FILE):
+              try:
+                  history = json.load(open(HISTORY_FILE, encoding="utf-8"))
+              except Exception:
+                  history = []
+          else:
+              history = []
+
+          recent_history = history[-30:]
+
+          history_text = "NONE"
+          if recent_history:
+              history_text = "\n".join(
+                  f"- {item.get('title','')} | {item.get('premise','')}"
+                  for item in recent_history
+              )
 
           schema = {
               "type": "object",
               "properties": {
                   "title": {"type": "string"},
                   "hook": {"type": "string"},
-                  "story": {"type": "string"},
-                  "ending": {"type": "string"},
+                  "setting": {"type": "string"},
+                  "conflict": {"type": "string"},
+                  "turning_point": {"type": "string"},
+                  "payoff": {"type": "string"},
                   "description": {"type": "string"},
-
                   "characters": {
                       "type": "array",
                       "items": {
@@ -53,7 +193,6 @@ jobs:
                           "additionalProperties": False
                       }
                   },
-
                   "scenes": {
                       "type": "array",
                       "items": {
@@ -78,116 +217,119 @@ jobs:
                       }
                   }
               },
-
               "required": [
                   "title",
                   "hook",
-                  "story",
-                  "ending",
+                  "setting",
+                  "conflict",
+                  "turning_point",
+                  "payoff",
                   "description",
                   "characters",
                   "scenes"
               ],
-
               "additionalProperties": False
           }
 
-          system_prompt = """
-          You are an expert writer of original cinematic motivational
-          micro-stories for YouTube Shorts.
+          prompt = f"""
+          Create ONE completely original cinematic story for a 45-60 second
+          YouTube Short.
 
-          Create completely ORIGINAL fiction.
+          THIS MUST FEEL LIKE A REAL MINI-STORY, NOT A MOTIVATIONAL POEM.
 
-          The story must:
-          - feel human and emotionally believable
-          - open with a strong curiosity hook
-          - contain one clear conflict
-          - build emotional tension
-          - contain a meaningful turning point
-          - end with a memorable emotional payoff
-          - be advertiser-friendly
-          - avoid graphic violence
-          - avoid celebrities
-          - avoid famous fictional characters
-          - avoid copyrighted universes
-          - avoid copied internet stories
-          - avoid generic quote compilations
-          - avoid preachy writing
+          Creative brief for this run:
+          - Story mode: {brief['story_mode']}
+          - Primary emotion: {brief['primary_emotion']}
+          - Hook style: {brief['hook_style']}
+          - Setting: {brief['setting']}
+          - Conflict: {brief['conflict']}
+          - Twist direction: {brief['twist']}
+          - Ending style: {brief['ending']}
 
-          The video is FACELESS.
+          Recent stories from this channel are listed below.
+          Do NOT repeat their premise, title pattern, setting, central object,
+          emotional beat, or ending idea. Make this story clearly different.
 
-          Visuals should use:
-          - silhouettes
-          - backs of people
-          - hands
-          - close-ups
-          - objects
-          - environments
-          - shadows
-          - reflections
-          - cinematic wide shots
-          - over-the-shoulder framing without visible faces
+          {history_text}
 
-          Maintain visual continuity across scenes.
+          CORE STORY RULES:
+          1. Start with an immediately intriguing concrete situation.
+          2. Give the protagonist a specific want, problem, or decision.
+          3. Show events and choices; do not explain a generic life lesson.
+          4. Include one meaningful turning point.
+          5. Make the emotional payoff earned by what happened earlier.
+          6. End with a memorable line or action, not a generic quote.
+          7. Use natural spoken English.
+          8. Target 120-145 narration words total.
+          9. Make the story understandable without context.
+          10. Keep it advertiser-friendly and non-graphic.
+          11. Do not use celebrities, existing fictional characters, brands,
+              movie plots, song lyrics, or copied internet stories.
+          12. Never ask the viewer to like, subscribe, comment, or share.
+
+          AVOID THESE OVERUSED PHRASES AND METAPHORS:
+          - "believe in yourself"
+          - "never give up"
+          - "the power of hope"
+          - "the human spirit"
+          - "smallest light"
+          - "darkness and light" as the main metaphor
+          - "journey of a thousand miles"
+          - "everything happens for a reason"
+          - "when one door closes"
+          - "follow your dreams"
+          - "sometimes life"
+          - "little did they know"
+          - "in the end, it was not about"
+          - "a testament to"
+          - "the world felt like"
+
+          STYLE:
+          - concrete
+          - visual
+          - emotionally restrained
+          - cinematic
+          - surprising but believable
+          - one clear story
+          - no multiple subplots
+
+          FACELESS VISUAL RULES:
+          Every visual prompt must avoid clearly visible identifiable faces.
+          Prefer backs, silhouettes, hands, close-ups, objects, reflections,
+          shadows, over-the-shoulder shots, wide environmental compositions,
+          and partial body framing.
+
+          For character consistency, keep clothing, age range, physical build,
+          and important props consistent across scenes.
 
           IMPORTANT:
-          Do not calculate scene durations.
-          Only provide scene narration and visual instructions.
-          """
+          - Create 8-10 scenes.
+          - Do NOT provide scene durations.
+          - Each scene's narration must be a genuine part of the same story.
+          - Scene 1 must contain the hook.
+          - The final scene must deliver the payoff.
+          - Do not split a sentence awkwardly merely to create a scene.
+          - Do not make scenes generic filler.
 
-          user_prompt = """
-          Create one original emotional/motivational YouTube Short.
-
-          TARGET:
-          About 55-60 seconds when narrated naturally.
-
-          NARRATION:
-          Target approximately 125-140 spoken words total.
-
-          STRUCTURE:
-          1. Immediate hook
-          2. Situation
-          3. Conflict
-          4. Escalation
-          5. Turning point
-          6. Emotional payoff
-          7. Memorable final line
-
-          SCENES:
-          Create 8-10 scenes.
-          Each scene must contain only the narration assigned to that scene
-          plus its visual instructions.
-
-          Do NOT provide duration_seconds.
-
-          Avoid:
-          - "Hey guys"
-          - filler
-          - generic motivational quotes
-          - like/subscribe requests
-          - engagement bait
+          Return ONLY the requested JSON structure.
           """
 
           payload = {
               "model": "openai/gpt-oss-20b",
               "messages": [
                   {
-                      "role": "system",
-                      "content": system_prompt
-                  },
-                  {
                       "role": "user",
-                      "content": user_prompt
+                      "content": prompt
                   }
               ],
               "reasoning_effort": "low",
-              "reasoning_format": "hidden",
-              "temperature": 0.85,
-              "max_completion_tokens": 4500,
+              "include_reasoning": False,
+              "temperature": 0.9,
+              "max_completion_tokens": 5000,
               "response_format": {
                   "type": "json_schema",
                   "json_schema": {
-                      "name": "short_story_package",
+                      "name": "cinematic_short_story",
                       "strict": True,
                       "schema": schema
                   }
@@ -210,9 +352,7 @@ jobs:
                   request,
                   timeout=180
               ) as response:
-                  result = json.loads(
-                      response.read().decode("utf-8")
-                  )
+                  result = json.loads(response.read().decode("utf-8"))
           except urllib.error.HTTPError as e:
               print(f"HTTP ERROR: {e.code}")
               print(
@@ -223,106 +363,143 @@ jobs:
               )
               raise
 
-          message = result["choices"][0]["message"]
-          content = message.get("content", "")
+          content = result["choices"][0]["message"].get("content", "")
 
           if not content:
               raise RuntimeError("Groq returned empty content.")
 
           data = json.loads(content)
-
           scenes = data["scenes"]
 
           if not 8 <= len(scenes) <= 10:
               raise RuntimeError(
-                  f"Expected 8-10 scenes, got {len(scenes)}."
+                  f"Expected 8-10 scenes, got {len(scenes)}"
               )
 
-          # ------------------------------------------------------------
-          # Build complete narration from scenes.
-          # ------------------------------------------------------------
-
-          scene_words = []
-
-          for scene in scenes:
-              text = scene["narration"].strip()
-              words = len(text.split())
-
-              if words < 2:
-                  raise RuntimeError(
-                      f"Scene {scene['scene']} has too little narration."
-                  )
-
-              scene_words.append(words)
-
-          total_words = sum(scene_words)
-
-          if not 115 <= total_words <= 155:
-              raise RuntimeError(
-                  f"Generated narration has {total_words} words. "
-                  f"Expected approximately 125-140."
-              )
-
-          # ------------------------------------------------------------
-          # Deterministically assign EXACTLY 58 seconds.
-          #
-          # Approx. 2 sec minimum per scene, remaining time distributed
-          # according to narration length.
-          # ------------------------------------------------------------
-
-          number_of_scenes = len(scenes)
-
-          minimum_per_scene = 2
-
-          if number_of_scenes * minimum_per_scene >= TARGET_SECONDS:
-              raise RuntimeError(
-                  "Too many scenes for the target duration."
-              )
-
-          remaining = TARGET_SECONDS - (
-              number_of_scenes * minimum_per_scene
-          )
-
-          raw_extra = [
-              remaining * (w / total_words)
-              for w in scene_words
+          words = [
+              len(scene["narration"].split())
+              for scene in scenes
           ]
 
-          extra = [int(x) for x in raw_extra]
+          total_words = sum(words)
 
-          leftover = remaining - sum(extra)
+          if not 120 <= total_words <= 145:
+              raise RuntimeError(
+                  f"Narration has {total_words} words; expected 120-145."
+              )
 
-          fractions = sorted(
-              range(number_of_scenes),
-              key=lambda i: raw_extra[i] - extra[i],
+          banned = [
+              "believe in yourself",
+              "never give up",
+              "the power of hope",
+              "the human spirit",
+              "smallest light",
+              "everything happens for a reason",
+              "when one door closes",
+              "follow your dreams",
+              "little did they know",
+              "a testament to",
+              "in the end, it was not about"
+          ]
+
+          combined = (
+              data["title"] + " " +
+              data["hook"] + " " +
+              data["turning_point"] + " " +
+              data["payoff"] + " " +
+              " ".join(
+                  scene["narration"]
+                  for scene in scenes
+              )
+          ).lower()
+
+          found_banned = [
+              phrase
+              for phrase in banned
+              if phrase in combined
+          ]
+
+          if found_banned:
+              raise RuntimeError(
+                  "Overused phrase detected: " +
+                  ", ".join(found_banned)
+              )
+
+          concrete_markers = [
+              "door", "key", "letter", "phone", "train",
+              "bus", "shop", "store", "school", "hospital",
+              "kitchen", "wallet", "bag", "ticket", "box",
+              "photo", "receipt", "car", "bike", "bench",
+              "window", "coffee", "flower", "package",
+              "umbrella", "coat", "clock", "watch", "ring",
+              "book", "note", "cash", "food", "room", "street",
+              "station", "restaurant", "library", "market"
+          ]
+
+          concrete_hits = sum(
+              1
+              for marker in concrete_markers
+              if marker in combined
+          )
+
+          if concrete_hits < 3:
+              raise RuntimeError(
+                  "Story is too abstract; it needs more concrete events "
+                  "and objects."
+              )
+
+          minimum_scene_seconds = 3
+          remaining = TARGET_SECONDS - (
+              len(scenes) * minimum_scene_seconds
+          )
+
+          if remaining <= 0:
+              raise RuntimeError(
+                  "Too many scenes for target duration."
+              )
+
+          raw = [
+              remaining * (word_count / total_words)
+              for word_count in words
+          ]
+
+          extras = [int(value) for value in raw]
+
+          leftover = remaining - sum(extras)
+
+          order = sorted(
+              range(len(raw)),
+              key=lambda index:
+                  raw[index] - extras[index],
               reverse=True
           )
 
-          for i in fractions[:leftover]:
-              extra[i] += 1
+          for index in order[:leftover]:
+              extras[index] += 1
 
           durations = [
-              minimum_per_scene + x
-              for x in extra
+              minimum_scene_seconds + extra
+              for extra in extras
           ]
 
           if sum(durations) != TARGET_SECONDS:
               raise RuntimeError(
-                  "Internal duration calculation failed."
+                  "Duration calculation failed."
               )
-
-          # ------------------------------------------------------------
-          # Save final scene data.
-          # ------------------------------------------------------------
 
           for index, scene in enumerate(scenes):
               scene["scene"] = index + 1
               scene["duration_seconds"] = durations[index]
 
-          output_dir = "output"
+          data["hook"] = scenes[0]["narration"].strip()
+
+          data["story"] = " ".join(
+              scene["narration"].strip()
+              for scene in scenes
+          )
 
           with open(
-              f"{output_dir}/story.json",
+              "output/story.json",
               "w",
               encoding="utf-8"
           ) as f:
@@ -334,28 +511,28 @@ jobs:
               )
 
           with open(
-              f"{output_dir}/title.txt",
+              "output/title.txt",
               "w",
               encoding="utf-8"
           ) as f:
               f.write(data["title"])
 
           with open(
-              f"{output_dir}/script.txt",
+              "output/script.txt",
               "w",
               encoding="utf-8"
           ) as f:
               f.write(data["story"])
 
           with open(
-              f"{output_dir}/description.txt",
+              "output/description.txt",
               "w",
               encoding="utf-8"
           ) as f:
               f.write(data["description"])
 
           with open(
-              f"{output_dir}/scenes.json",
+              "output/scenes.json",
               "w",
               encoding="utf-8"
           ) as f:
@@ -366,16 +543,67 @@ jobs:
                   indent=2
               )
 
+          premise = (
+              data["setting"] + " | " +
+              data["conflict"] + " | " +
+              data["turning_point"]
+          )
+
+          fingerprint = hashlib.sha256(
+              (
+                  data["title"] +
+                  "|" +
+                  premise
+              ).encode("utf-8")
+          ).hexdigest()[:16]
+
+          history.append({
+              "title": data["title"],
+              "premise": premise,
+              "fingerprint": fingerprint,
+              "timestamp": int(time.time())
+          })
+
+          with open(
+              HISTORY_FILE,
+              "w",
+              encoding="utf-8"
+          ) as f:
+              json.dump(
+                  history[-50:],
+                  f,
+                  ensure_ascii=False,
+                  indent=2
+              )
+
           print("===================================")
           print("✅ STORY GENERATED")
           print("===================================")
           print("Title:", data["title"])
+          print("Mode:", brief["story_mode"])
+          print("Emotion:", brief["primary_emotion"])
+          print("Setting:", brief["setting"])
           print("Scenes:", len(scenes))
           print("Words:", total_words)
           print("Duration:", sum(durations), "seconds")
           print("Durations:", durations)
+          print("Concrete markers:", concrete_hits)
           print("===================================")
           PY
+
+      - name: Commit story history
+        run: |
+          git config user.name "github-actions[bot]"
+          git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
+          git add .github/data/story_history.json
+
+          if git diff --cached --quiet; then
+            echo "No history changes to commit."
+          else
+            git commit -m "Update AI story history"
+            git push
+          fi
 
       - name: Upload story package
         uses: actions/upload-artifact@v4
