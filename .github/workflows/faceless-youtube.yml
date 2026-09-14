@@ -1,14 +1,14 @@
-name: Faceless YouTube Agent
+name: AI Short Story Generator
 
 on:
   workflow_dispatch:
 
 jobs:
-  generate-content:
+  generate-story:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Generate YouTube package
+      - name: Generate original 60-second story
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
@@ -19,94 +19,190 @@ jobs:
           python3 - <<'PY'
           import json
           import os
-          import urllib.request
           import urllib.error
+          import urllib.request
 
           api_key = os.environ["GROQ_API_KEY"]
 
-          prompt = """
-          Create one original faceless YouTube video package about one surprising,
-          evergreen topic with broad worldwide appeal.
+          schema = {
+              "type": "object",
+              "properties": {
+                  "title": {"type": "string"},
+                  "hook": {"type": "string"},
+                  "story": {"type": "string"},
+                  "ending": {"type": "string"},
+                  "description": {"type": "string"},
 
-          Requirements:
-          - Strong curiosity hook.
-          - Natural narration suitable for AI voice.
-          - About 700-900 words of narration.
-          - No "hey guys" and no filler.
-          - Create 8-12 numbered visual scenes.
-          - Every scene needs narration and a visual description.
-          - Create a compelling YouTube title.
-          - Create a YouTube description.
-          - Keep the content advertiser-friendly and broadly suitable for YouTube.
+                  "characters": {
+                      "type": "array",
+                      "items": {
+                          "type": "object",
+                          "properties": {
+                              "name": {"type": "string"},
+                              "role": {"type": "string"},
+                              "visual_identity": {"type": "string"}
+                          },
+                          "required": [
+                              "name",
+                              "role",
+                              "visual_identity"
+                          ],
+                          "additionalProperties": False
+                      }
+                  },
 
-          Return the requested structured fields only.
+                  "scenes": {
+                      "type": "array",
+                      "items": {
+                          "type": "object",
+                          "properties": {
+                              "scene": {"type": "integer"},
+                              "duration_seconds": {"type": "integer"},
+                              "narration": {"type": "string"},
+                              "visual_prompt": {"type": "string"},
+                              "camera": {"type": "string"},
+                              "on_screen_text": {"type": "string"},
+                              "sfx": {"type": "string"}
+                          },
+                          "required": [
+                              "scene",
+                              "duration_seconds",
+                              "narration",
+                              "visual_prompt",
+                              "camera",
+                              "on_screen_text",
+                              "sfx"
+                          ],
+                          "additionalProperties": False
+                      }
+                  }
+              },
+
+              "required": [
+                  "title",
+                  "hook",
+                  "story",
+                  "ending",
+                  "description",
+                  "characters",
+                  "scenes"
+              ],
+
+              "additionalProperties": False
+          }
+
+          system_prompt = """
+          You are an expert writer of original cinematic motivational
+          micro-stories for YouTube Shorts.
+
+          Create completely ORIGINAL fiction.
+
+          The content must:
+          - feel human and emotionally believable
+          - have a strong curiosity hook immediately
+          - contain one clear conflict
+          - build emotional tension
+          - end with a satisfying and memorable final line
+          - be advertiser-friendly
+          - avoid graphic violence
+          - avoid celebrities
+          - avoid famous fictional characters
+          - avoid copyrighted universes
+          - avoid copied internet stories
+          - avoid generic quote compilations
+          - avoid preachy or cheesy writing
+
+          The video is FACELESS.
+
+          Therefore visual prompts must avoid identifiable faces.
+          Prefer:
+          - silhouettes
+          - backs of people
+          - hands
+          - close-ups
+          - objects
+          - environments
+          - shadows
+          - reflections where identity is not visible
+          - cinematic wide shots
+          - over-the-shoulder framing without visible faces
+
+          Visual continuity is extremely important.
+          Keep the same characters, clothing, locations and time of day
+          consistent across scenes whenever applicable.
+
+          Return ONLY the requested JSON structure.
+          """
+
+          user_prompt = """
+          Create one completely original motivational/emotional story for
+          a YouTube Short.
+
+          TARGET LENGTH:
+          45-60 seconds.
+
+          NARRATION:
+          Approximately 120-150 spoken words total.
+
+          STRUCTURE:
+          1. Immediate hook.
+          2. Introduce the situation.
+          3. Clear emotional conflict.
+          4. Escalation.
+          5. Turning point.
+          6. Emotional payoff.
+          7. Memorable final line.
+
+          SCENES:
+          Create 8-10 scenes.
+
+          The scene durations must add up to between 55 and 60 seconds.
+
+          Every scene must:
+          - directly match its narration
+          - have a production-ready visual prompt
+          - specify a camera movement/framing
+          - optionally contain concise on-screen text
+          - specify suitable SFX
+
+          The story should feel cinematic rather than like a motivational
+          speech.
+
+          Avoid:
+          - "Believe in yourself" style generic advice
+          - unnecessary introductions
+          - "Hey guys"
+          - asking viewers to like/subscribe
+          - engagement bait
           """
 
           payload = {
               "model": "openai/gpt-oss-20b",
+
               "messages": [
                   {
+                      "role": "system",
+                      "content": system_prompt
+                  },
+                  {
                       "role": "user",
-                      "content": prompt
+                      "content": user_prompt
                   }
               ],
+
               "reasoning_effort": "low",
               "reasoning_format": "hidden",
-              "temperature": 0.7,
+
+              "temperature": 0.85,
+
               "max_completion_tokens": 5000,
+
               "response_format": {
                   "type": "json_schema",
                   "json_schema": {
-                      "name": "youtube_package",
+                      "name": "short_story_package",
                       "strict": True,
-                      "schema": {
-                          "type": "object",
-                          "properties": {
-                              "topic": {
-                                  "type": "string"
-                              },
-                              "title": {
-                                  "type": "string"
-                              },
-                              "description": {
-                                  "type": "string"
-                              },
-                              "script": {
-                                  "type": "string"
-                              },
-                              "scenes": {
-                                  "type": "array",
-                                  "items": {
-                                      "type": "object",
-                                      "properties": {
-                                          "scene": {
-                                              "type": "integer"
-                                          },
-                                          "narration": {
-                                              "type": "string"
-                                          },
-                                          "visual": {
-                                              "type": "string"
-                                          }
-                                      },
-                                      "required": [
-                                          "scene",
-                                          "narration",
-                                          "visual"
-                                      ],
-                                      "additionalProperties": False
-                                  }
-                              }
-                          },
-                          "required": [
-                              "topic",
-                              "title",
-                              "description",
-                              "script",
-                              "scenes"
-                          ],
-                          "additionalProperties": False
-                      }
+                      "schema": schema
                   }
               }
           }
@@ -115,67 +211,141 @@ jobs:
               "https://api.groq.com/openai/v1/chat/completions",
               data=json.dumps(payload).encode("utf-8"),
               headers={
-                  "Content-Type": "application/json",
                   "Authorization": f"Bearer {api_key}",
+                  "Content-Type": "application/json",
                   "User-Agent": "Aladdin-YT-Auto/1.0"
               },
               method="POST"
           )
 
           try:
-              with urllib.request.urlopen(request, timeout=180) as response:
-                  result = json.loads(response.read().decode("utf-8"))
+              with urllib.request.urlopen(
+                  request,
+                  timeout=180
+              ) as response:
+                  result = json.loads(
+                      response.read().decode("utf-8")
+                  )
+
           except urllib.error.HTTPError as e:
               print(f"HTTP ERROR: {e.code}")
-              print(e.read().decode("utf-8", errors="replace"))
+              print(
+                  e.read().decode(
+                      "utf-8",
+                      errors="replace"
+                  )
+              )
               raise
 
-          content = result["choices"][0]["message"].get("content", "")
+          message = result["choices"][0]["message"]
+          content = message.get("content", "")
 
           if not content:
-              raise RuntimeError("Groq returned empty content.")
+              raise RuntimeError(
+                  "Groq returned empty content."
+              )
 
           data = json.loads(content)
 
-          required = [
-              "topic",
-              "title",
-              "description",
-              "script",
-              "scenes"
-          ]
+          scenes = data["scenes"]
 
-          for key in required:
-              if key not in data:
-                  raise RuntimeError(f"Missing required field: {key}")
+          if not 8 <= len(scenes) <= 10:
+              raise RuntimeError(
+                  f"Expected 8-10 scenes, got {len(scenes)}"
+              )
 
-          with open("output/content.json", "w", encoding="utf-8") as f:
-              json.dump(data, f, ensure_ascii=False, indent=2)
+          total_duration = sum(
+              int(scene["duration_seconds"])
+              for scene in scenes
+          )
 
-          with open("output/topic.txt", "w", encoding="utf-8") as f:
-              f.write(data["topic"])
+          if not 55 <= total_duration <= 60:
+              raise RuntimeError(
+                  f"Scene duration total is "
+                  f"{total_duration}s; expected 55-60s."
+              )
 
-          with open("output/title.txt", "w", encoding="utf-8") as f:
+          narration_words = len(
+              data["story"].split()
+          )
+
+          if not 100 <= narration_words <= 180:
+              raise RuntimeError(
+                  f"Story word count is "
+                  f"{narration_words}; expected roughly "
+                  f"100-180 words."
+              )
+
+          os.makedirs("output", exist_ok=True)
+
+          with open(
+              "output/story.json",
+              "w",
+              encoding="utf-8"
+          ) as f:
+              json.dump(
+                  data,
+                  f,
+                  ensure_ascii=False,
+                  indent=2
+              )
+
+          with open(
+              "output/title.txt",
+              "w",
+              encoding="utf-8"
+          ) as f:
               f.write(data["title"])
 
-          with open("output/description.txt", "w", encoding="utf-8") as f:
+          with open(
+              "output/script.txt",
+              "w",
+              encoding="utf-8"
+          ) as f:
+              f.write(data["story"])
+
+          with open(
+              "output/description.txt",
+              "w",
+              encoding="utf-8"
+          ) as f:
               f.write(data["description"])
 
-          with open("output/script.txt", "w", encoding="utf-8") as f:
-              f.write(data["script"])
+          with open(
+              "output/scenes.json",
+              "w",
+              encoding="utf-8"
+          ) as f:
+              json.dump(
+                  scenes,
+                  f,
+                  ensure_ascii=False,
+                  indent=2
+              )
 
-          with open("output/scenes.json", "w", encoding="utf-8") as f:
-              json.dump(data["scenes"], f, ensure_ascii=False, indent=2)
-
-          print("✅ AI CONTENT GENERATED")
-          print("Topic:", data["topic"])
+          print("===================================")
+          print("✅ STORY GENERATED SUCCESSFULLY")
+          print("===================================")
           print("Title:", data["title"])
-          print("Scenes:", len(data["scenes"]))
+          print(
+              "Scenes:",
+              len(scenes)
+          )
+          print(
+              "Duration:",
+              total_duration,
+              "seconds"
+          )
+          print(
+              "Story words:",
+              narration_words
+          )
+          print("===================================")
           PY
 
-      - name: Upload generated content
+      - name: Upload story package
         uses: actions/upload-artifact@v4
         with:
-          name: youtube-content
+          name: ai-short-story
           path: output/
           retention-days: 7
