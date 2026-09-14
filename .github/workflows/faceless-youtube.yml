@@ -22,6 +22,9 @@ jobs:
           import urllib.error
           import urllib.request
 
+          API_URL = "https://api.groq.com/openai/v1/chat/completions"
+          TARGET_SECONDS = 58
+
           api_key = os.environ["GROQ_API_KEY"]
 
           schema = {
@@ -57,7 +60,6 @@ jobs:
                           "type": "object",
                           "properties": {
                               "scene": {"type": "integer"},
-                              "duration_seconds": {"type": "integer"},
                               "narration": {"type": "string"},
                               "visual_prompt": {"type": "string"},
                               "camera": {"type": "string"},
@@ -66,7 +68,6 @@ jobs:
                           },
                           "required": [
                               "scene",
-                              "duration_seconds",
                               "narration",
                               "visual_prompt",
                               "camera",
@@ -97,12 +98,13 @@ jobs:
 
           Create completely ORIGINAL fiction.
 
-          The content must:
+          The story must:
           - feel human and emotionally believable
-          - have a strong curiosity hook immediately
+          - open with a strong curiosity hook
           - contain one clear conflict
           - build emotional tension
-          - end with a satisfying and memorable final line
+          - contain a meaningful turning point
+          - end with a memorable emotional payoff
           - be advertiser-friendly
           - avoid graphic violence
           - avoid celebrities
@@ -110,12 +112,11 @@ jobs:
           - avoid copyrighted universes
           - avoid copied internet stories
           - avoid generic quote compilations
-          - avoid preachy or cheesy writing
+          - avoid preachy writing
 
           The video is FACELESS.
 
-          Therefore visual prompts must avoid identifiable faces.
-          Prefer:
+          Visuals should use:
           - silhouettes
           - backs of people
           - hands
@@ -123,62 +124,52 @@ jobs:
           - objects
           - environments
           - shadows
-          - reflections where identity is not visible
+          - reflections
           - cinematic wide shots
           - over-the-shoulder framing without visible faces
 
-          Visual continuity is extremely important.
-          Keep the same characters, clothing, locations and time of day
-          consistent across scenes whenever applicable.
+          Maintain visual continuity across scenes.
 
-          Return ONLY the requested JSON structure.
+          IMPORTANT:
+          Do not calculate scene durations.
+          Only provide scene narration and visual instructions.
           """
 
           user_prompt = """
-          Create one completely original motivational/emotional story for
-          a YouTube Short.
+          Create one original emotional/motivational YouTube Short.
 
-          TARGET LENGTH:
-          45-60 seconds.
+          TARGET:
+          About 55-60 seconds when narrated naturally.
 
           NARRATION:
-          Approximately 120-150 spoken words total.
+          Target approximately 125-140 spoken words total.
 
           STRUCTURE:
-          1. Immediate hook.
-          2. Introduce the situation.
-          3. Clear emotional conflict.
-          4. Escalation.
-          5. Turning point.
-          6. Emotional payoff.
-          7. Memorable final line.
+          1. Immediate hook
+          2. Situation
+          3. Conflict
+          4. Escalation
+          5. Turning point
+          6. Emotional payoff
+          7. Memorable final line
 
           SCENES:
           Create 8-10 scenes.
+          Each scene must contain only the narration assigned to that scene
+          plus its visual instructions.
 
-          The scene durations must add up to between 55 and 60 seconds.
-
-          Every scene must:
-          - directly match its narration
-          - have a production-ready visual prompt
-          - specify a camera movement/framing
-          - optionally contain concise on-screen text
-          - specify suitable SFX
-
-          The story should feel cinematic rather than like a motivational
-          speech.
+          Do NOT provide duration_seconds.
 
           Avoid:
-          - "Believe in yourself" style generic advice
-          - unnecessary introductions
           - "Hey guys"
-          - asking viewers to like/subscribe
+          - filler
+          - generic motivational quotes
+          - like/subscribe requests
           - engagement bait
           """
 
           payload = {
               "model": "openai/gpt-oss-20b",
-
               "messages": [
                   {
                       "role": "system",
@@ -189,14 +180,10 @@ jobs:
                       "content": user_prompt
                   }
               ],
-
               "reasoning_effort": "low",
               "reasoning_format": "hidden",
-
               "temperature": 0.85,
-
-              "max_completion_tokens": 5000,
-
+              "max_completion_tokens": 4500,
               "response_format": {
                   "type": "json_schema",
                   "json_schema": {
@@ -208,7 +195,7 @@ jobs:
           }
 
           request = urllib.request.Request(
-              "https://api.groq.com/openai/v1/chat/completions",
+              API_URL,
               data=json.dumps(payload).encode("utf-8"),
               headers={
                   "Authorization": f"Bearer {api_key}",
@@ -226,7 +213,6 @@ jobs:
                   result = json.loads(
                       response.read().decode("utf-8")
                   )
-
           except urllib.error.HTTPError as e:
               print(f"HTTP ERROR: {e.code}")
               print(
@@ -241,9 +227,7 @@ jobs:
           content = message.get("content", "")
 
           if not content:
-              raise RuntimeError(
-                  "Groq returned empty content."
-              )
+              raise RuntimeError("Groq returned empty content.")
 
           data = json.loads(content)
 
@@ -251,35 +235,94 @@ jobs:
 
           if not 8 <= len(scenes) <= 10:
               raise RuntimeError(
-                  f"Expected 8-10 scenes, got {len(scenes)}"
+                  f"Expected 8-10 scenes, got {len(scenes)}."
               )
 
-          total_duration = sum(
-              int(scene["duration_seconds"])
-              for scene in scenes
+          # ------------------------------------------------------------
+          # Build complete narration from scenes.
+          # ------------------------------------------------------------
+
+          scene_words = []
+
+          for scene in scenes:
+              text = scene["narration"].strip()
+              words = len(text.split())
+
+              if words < 2:
+                  raise RuntimeError(
+                      f"Scene {scene['scene']} has too little narration."
+                  )
+
+              scene_words.append(words)
+
+          total_words = sum(scene_words)
+
+          if not 115 <= total_words <= 155:
+              raise RuntimeError(
+                  f"Generated narration has {total_words} words. "
+                  f"Expected approximately 125-140."
+              )
+
+          # ------------------------------------------------------------
+          # Deterministically assign EXACTLY 58 seconds.
+          #
+          # Approx. 2 sec minimum per scene, remaining time distributed
+          # according to narration length.
+          # ------------------------------------------------------------
+
+          number_of_scenes = len(scenes)
+
+          minimum_per_scene = 2
+
+          if number_of_scenes * minimum_per_scene >= TARGET_SECONDS:
+              raise RuntimeError(
+                  "Too many scenes for the target duration."
+              )
+
+          remaining = TARGET_SECONDS - (
+              number_of_scenes * minimum_per_scene
           )
 
-          if not 55 <= total_duration <= 60:
-              raise RuntimeError(
-                  f"Scene duration total is "
-                  f"{total_duration}s; expected 55-60s."
-              )
+          raw_extra = [
+              remaining * (w / total_words)
+              for w in scene_words
+          ]
 
-          narration_words = len(
-              data["story"].split()
+          extra = [int(x) for x in raw_extra]
+
+          leftover = remaining - sum(extra)
+
+          fractions = sorted(
+              range(number_of_scenes),
+              key=lambda i: raw_extra[i] - extra[i],
+              reverse=True
           )
 
-          if not 100 <= narration_words <= 180:
+          for i in fractions[:leftover]:
+              extra[i] += 1
+
+          durations = [
+              minimum_per_scene + x
+              for x in extra
+          ]
+
+          if sum(durations) != TARGET_SECONDS:
               raise RuntimeError(
-                  f"Story word count is "
-                  f"{narration_words}; expected roughly "
-                  f"100-180 words."
+                  "Internal duration calculation failed."
               )
 
-          os.makedirs("output", exist_ok=True)
+          # ------------------------------------------------------------
+          # Save final scene data.
+          # ------------------------------------------------------------
+
+          for index, scene in enumerate(scenes):
+              scene["scene"] = index + 1
+              scene["duration_seconds"] = durations[index]
+
+          output_dir = "output"
 
           with open(
-              "output/story.json",
+              f"{output_dir}/story.json",
               "w",
               encoding="utf-8"
           ) as f:
@@ -291,28 +334,28 @@ jobs:
               )
 
           with open(
-              "output/title.txt",
+              f"{output_dir}/title.txt",
               "w",
               encoding="utf-8"
           ) as f:
               f.write(data["title"])
 
           with open(
-              "output/script.txt",
+              f"{output_dir}/script.txt",
               "w",
               encoding="utf-8"
           ) as f:
               f.write(data["story"])
 
           with open(
-              "output/description.txt",
+              f"{output_dir}/description.txt",
               "w",
               encoding="utf-8"
           ) as f:
               f.write(data["description"])
 
           with open(
-              "output/scenes.json",
+              f"{output_dir}/scenes.json",
               "w",
               encoding="utf-8"
           ) as f:
@@ -324,22 +367,13 @@ jobs:
               )
 
           print("===================================")
-          print("✅ STORY GENERATED SUCCESSFULLY")
+          print("✅ STORY GENERATED")
           print("===================================")
           print("Title:", data["title"])
-          print(
-              "Scenes:",
-              len(scenes)
-          )
-          print(
-              "Duration:",
-              total_duration,
-              "seconds"
-          )
-          print(
-              "Story words:",
-              narration_words
-          )
+          print("Scenes:", len(scenes))
+          print("Words:", total_words)
+          print("Duration:", sum(durations), "seconds")
+          print("Durations:", durations)
           print("===================================")
           PY
 
