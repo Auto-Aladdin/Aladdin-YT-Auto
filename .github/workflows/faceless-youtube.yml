@@ -16,7 +16,7 @@ jobs:
         with:
           fetch-depth: 0
 
-      - name: Generate, critique, repair and plan story
+      - name: Generate and quality-check story
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
@@ -33,14 +33,27 @@ jobs:
           import urllib.error
           import urllib.request
 
+          # ============================================================
+          # SETTINGS
+          # ============================================================
+
           API_URL = "https://api.groq.com/openai/v1/chat/completions"
           HISTORY_FILE = ".github/data/story_history.json"
 
-          MIN_WORDS = 105
-          MAX_WORDS = 405
+          # A normal finished story must eventually fall in this range.
+          MIN_FINAL_WORDS = 105
+          MAX_FINAL_WORDS = 405
+
+          # Initial drafts are allowed to be a little shorter because
+          # we automatically repair them before quality review.
+          MIN_DRAFT_WORDS = 85
+
           WORDS_PER_MINUTE = 135
+
           MIN_DURATION = 45
           MAX_DURATION = 180
+
+          MODEL = "openai/gpt-oss-20b"
 
           API_KEY = os.environ["GROQ_API_KEY"]
 
@@ -70,7 +83,10 @@ jobs:
               "a mistake leading to an unexpected opportunity",
               "quiet honesty",
               "forgiveness after a misunderstanding",
-              "someone choosing kindness when it costs them"
+              "someone choosing kindness when it costs them",
+              "a secret finally revealed",
+              "a sacrifice nobody notices",
+              "an ordinary day interrupted by an extraordinary choice"
           ]
 
           EMOTIONS = [
@@ -88,18 +104,20 @@ jobs:
               "surprise",
               "nostalgia",
               "determination",
-              "compassion"
+              "compassion",
+              "bittersweet acceptance"
           ]
 
-          HOOKS = [
+          HOOK_STYLES = [
               "start at the most intriguing moment",
-              "start with a specific time or place",
+              "start with a specific time and place",
               "start with a surprising action",
               "start with a concrete mystery",
               "start with a consequence before explaining its cause",
               "start with an unusual object and why it matters",
               "start with a promise that seems impossible",
-              "start with someone making a decision they may regret"
+              "start with someone making a decision they may regret",
+              "start with a sentence that creates an immediate unanswered question"
           ]
 
           SETTINGS = [
@@ -122,7 +140,11 @@ jobs:
               "a quiet cafe on a winter morning",
               "a neighborhood bus stop at midnight",
               "a small hotel lobby",
-              "a mechanic's garage at closing time"
+              "a mechanic's garage at closing time",
+              "a public park just before rain",
+              "a nearly empty convenience store",
+              "a small photography shop",
+              "an apartment rooftop at sunset"
           ]
 
           CONFLICTS = [
@@ -139,7 +161,9 @@ jobs:
               "a goodbye neither person is ready for",
               "a small mistake with unexpectedly large consequences",
               "deciding whether to tell an uncomfortable truth",
-              "choosing between convenience and doing what is right"
+              "choosing between convenience and doing what is right",
+              "a personal promise conflicting with an immediate responsibility",
+              "a person having to admit they were wrong"
           ]
 
           TWISTS = [
@@ -152,7 +176,9 @@ jobs:
               "a small sacrifice restores something much more important",
               "the final detail changes the meaning of the opening",
               "an ordinary object reveals an unexpected connection",
-              "the protagonist discovers the other person planned for them too"
+              "the protagonist discovers the other person planned for them too",
+              "a decision made earlier in the story suddenly matters",
+              "the person who appeared cold had a reason the protagonist never knew"
           ]
 
           ENDINGS = [
@@ -163,18 +189,9 @@ jobs:
               "an earned moment of relief",
               "an understated act of forgiveness",
               "a hopeful but believable final image",
-              "a final detail that makes the viewer rethink the story"
+              "a final detail that makes the viewer rethink the story",
+              "a subtle emotional reversal"
           ]
-
-          brief = {
-              "mode": rng.choice(STORY_MODES),
-              "emotion": rng.choice(EMOTIONS),
-              "hook": rng.choice(HOOKS),
-              "setting": rng.choice(SETTINGS),
-              "conflict": rng.choice(CONFLICTS),
-              "twist": rng.choice(TWISTS),
-              "ending": rng.choice(ENDINGS),
-          }
 
           # ============================================================
           # HISTORY
@@ -182,20 +199,40 @@ jobs:
 
           if os.path.exists(HISTORY_FILE):
               try:
-                  with open(HISTORY_FILE, encoding="utf-8") as f:
+                  with open(HISTORY_FILE, "r", encoding="utf-8") as f:
                       history = json.load(f)
               except Exception:
                   history = []
           else:
               history = []
 
-          previous = "\n".join(
-              f"- {item.get('title', '')} | {item.get('premise', '')}"
-              for item in history[-40:]
-          ) or "NONE"
+          previous_stories = history[-40:]
+
+          previous_text = "\n".join(
+              f"- Title: {item.get('title', '')} | "
+              f"Premise: {item.get('premise', '')}"
+              for item in previous_stories
+          )
+
+          if not previous_text:
+              previous_text = "NONE"
 
           # ============================================================
-          # STORY SCHEMA
+          # RANDOM CREATIVE BRIEF
+          # ============================================================
+
+          brief = {
+              "mode": rng.choice(STORY_MODES),
+              "emotion": rng.choice(EMOTIONS),
+              "hook": rng.choice(HOOK_STYLES),
+              "setting": rng.choice(SETTINGS),
+              "conflict": rng.choice(CONFLICTS),
+              "twist": rng.choice(TWISTS),
+              "ending": rng.choice(ENDINGS),
+          }
+
+          # ============================================================
+          # SCHEMAS
           # ============================================================
 
           story_schema = {
@@ -279,10 +316,6 @@ jobs:
               "additionalProperties": False
           }
 
-          # ============================================================
-          # CRITIC SCHEMA
-          # ============================================================
-
           critic_schema = {
               "type": "object",
               "properties": {
@@ -331,10 +364,6 @@ jobs:
               "additionalProperties": False
           }
 
-          # ============================================================
-          # VISUAL SCHEMA
-          # ============================================================
-
           visual_schema = {
               "type": "object",
               "properties": {
@@ -380,9 +409,14 @@ jobs:
           # GROQ CALL
           # ============================================================
 
-          def call_groq(prompt, schema, temperature, max_tokens):
+          def call_groq(
+              prompt,
+              schema,
+              temperature,
+              max_tokens
+          ):
               payload = {
-                  "model": "openai/gpt-oss-20b",
+                  "model": MODEL,
                   "messages": [
                       {
                           "role": "user",
@@ -419,18 +453,22 @@ jobs:
                       request,
                       timeout=180
                   ) as response:
-                      result = json.loads(
-                          response.read().decode("utf-8")
-                      )
+
+                      response_body = response.read().decode("utf-8")
+
+                      result = json.loads(response_body)
 
               except urllib.error.HTTPError as e:
+
                   print(f"HTTP ERROR: {e.code}")
-                  print(
-                      e.read().decode(
-                          "utf-8",
-                          errors="replace"
-                      )
+
+                  body = e.read().decode(
+                      "utf-8",
+                      errors="replace"
                   )
+
+                  print(body)
+
                   raise
 
               message = result["choices"][0]["message"]
@@ -445,42 +483,53 @@ jobs:
               return json.loads(content)
 
           # ============================================================
-          # LOCAL STORY CHECKS
+          # HELPERS
           # ============================================================
 
-          def local_story_checks(story):
-              scenes = story["scenes"]
-
-              if not 7 <= len(scenes) <= 18:
-                  raise ValueError(
-                      f"Expected 7-18 scenes, got {len(scenes)}."
-                  )
-
-              word_counts = [
+          def story_word_counts(story):
+              return [
                   len(scene["narration"].split())
-                  for scene in scenes
+                  for scene in story["scenes"]
               ]
 
-              total_words = sum(word_counts)
+          def total_story_words(story):
+              return sum(
+                  story_word_counts(story)
+              )
 
-              if not MIN_WORDS <= total_words <= MAX_WORDS:
+          def validate_story_structure(story):
+              if not 7 <= len(story["scenes"]) <= 18:
                   raise ValueError(
-                      f"Story has {total_words} words; "
-                      f"allowed {MIN_WORDS}-{MAX_WORDS}."
+                      "Story must contain 7-18 scenes."
                   )
 
+              words = total_story_words(story)
+
+              if words > MAX_FINAL_WORDS:
+                  raise ValueError(
+                      f"Story is too long: {words} words."
+                  )
+
+              if words < MIN_DRAFT_WORDS:
+                  raise ValueError(
+                      f"Story is extremely short: {words} words."
+                  )
+
+          def validate_story_content(story):
               text = (
                   story["title"] + " " +
                   story["hook"] + " " +
+                  story["setting"] + " " +
+                  story["conflict"] + " " +
                   story["turning_point"] + " " +
                   story["payoff"] + " " +
                   " ".join(
                       scene["narration"]
-                      for scene in scenes
+                      for scene in story["scenes"]
                   )
               ).lower()
 
-              banned = [
+              banned_phrases = [
                   "believe in yourself",
                   "never give up",
                   "the human spirit",
@@ -490,54 +539,40 @@ jobs:
                   "little did they know",
                   "a testament to",
                   "in the end, it was not about",
-                  "the power of hope"
+                  "the power of hope",
+                  "sometimes life"
               ]
 
-              found = [
-                  phrase
-                  for phrase in banned
-                  if phrase in text
-              ]
+              for phrase in banned_phrases:
+                  if phrase in text:
+                      raise ValueError(
+                          "Cliche detected: " + phrase
+                      )
 
-              if found:
-                  raise ValueError(
-                      "Cliche phrase detected: " +
-                      ", ".join(found)
-                  )
-
-              # Basic guards against the specific implausible patterns
-              # we've already encountered.
-              implausible = [
+              implausible_patterns = [
                   "trapped in a freezer",
                   "inside a freezer",
                   "stuck in a freezer",
-                  "locked inside a freezer"
+                  "locked inside a freezer",
+                  "trapped inside a freezer"
               ]
 
-              found = [
-                  phrase
-                  for phrase in implausible
-                  if phrase in text
-              ]
-
-              if found:
-                  raise ValueError(
-                      "Implausible premise detected: " +
-                      ", ".join(found)
-                  )
-
-              return word_counts, total_words
+              for phrase in implausible_patterns:
+                  if phrase in text:
+                      raise ValueError(
+                          "Implausible premise detected: " + phrase
+                      )
 
           # ============================================================
-          # STORY GENERATION
+          # 1. GENERATE FIRST DRAFT
           # ============================================================
 
           story_prompt = f"""
-          Create ONE completely original cinematic emotional story for a
+          Write ONE completely original cinematic emotional story for a
           vertical YouTube Short.
 
           This must feel like a real short film in miniature,
-          NOT a motivational poem.
+          not a motivational poem.
 
           CREATIVE BRIEF
 
@@ -562,41 +597,35 @@ jobs:
           Ending style:
           {brief['ending']}
 
-          RECENT STORIES:
+          RECENT CHANNEL STORIES
 
-          {previous}
+          {previous_text}
 
-          Do NOT repeat a recent story's:
-          - premise
-          - setting
-          - central object
-          - title pattern
-          - emotional beat
-          - twist
-          - ending idea
+          Do not repeat a recent story's premise, setting, object,
+          title pattern, emotional beat, twist, or ending.
 
           STORY REQUIREMENTS
 
-          - 105-405 spoken words.
-          - Natural runtime roughly 45-180 seconds.
-          - Do not pad a short story.
-          - Do not stretch a complete story.
-          - Give the protagonist a concrete goal or problem.
+          - Spoken narration should naturally support a 45-180 second video.
+          - Initial draft should be at least 85 words.
+          - Final production target will be 105-405 words.
+          - Never pad a story.
+          - Do not stretch a complete story unnecessarily.
+          - Give the protagonist a concrete problem or desire.
           - Make something concrete happen.
-          - Create a believable conflict.
-          - Give the protagonist a meaningful choice,
-            consequence, or sacrifice.
+          - Create genuine conflict.
+          - Give the protagonist a meaningful choice, consequence,
+            sacrifice, or realization.
           - Build logical escalation.
           - Make the turning point earned.
           - Make the ending pay off the setup.
           - Let the meaning emerge naturally from the events.
-          - Prefer one strong plot.
-          - Every scene must advance the plot.
-          - Keep all events physically plausible.
+          - Prefer one strong plot over several weak subplots.
+          - Every scene must advance the story.
+          - Keep events physically plausible.
           - No unexplained miracles.
           - No absurd coincidences.
-          - No random charity/medical/helping reveal added only
-            to manufacture emotion.
+          - No random charity or medical reveal inserted only to create emotion.
           - No celebrities.
           - No existing fictional characters.
           - No movie plots.
@@ -604,7 +633,7 @@ jobs:
           - No copied internet stories.
           - No calls to action.
 
-          AVOID:
+          AVOID THESE CLICHES:
 
           "believe in yourself"
           "never give up"
@@ -614,21 +643,22 @@ jobs:
           "follow your dreams"
           "little did they know"
           "a testament to"
+          "the power of hope"
 
           FACELESS DESIGN
 
-          The final video must work without identifiable faces.
+          The eventual video must work without identifiable faces.
 
-          Use meaningful actions, hands, silhouettes, backs,
-          objects, body language, shadows, reflections and environments.
+          Use meaningful actions, hands, silhouettes, backs, objects,
+          body language, shadows, reflections and environments.
 
           Create 7-18 scenes.
 
-          Each scene must contain only:
+          For this stage, every scene must contain ONLY:
           - scene number
           - narration
 
-          Return ONLY the story JSON.
+          Return ONLY JSON matching the supplied schema.
           """
 
           story = call_groq(
@@ -638,22 +668,110 @@ jobs:
               6500
           )
 
-          word_counts, total_words = local_story_checks(story)
+          validate_story_structure(story)
 
           # ============================================================
-          # FIRST CRITIC
+          # 2. LENGTH REPAIR
+          # ============================================================
+
+          initial_words = total_story_words(story)
+
+          if initial_words < MIN_FINAL_WORDS:
+
+              print("========================================")
+              print("⚠️ STORY IS TOO SHORT")
+              print("========================================")
+              print(
+                  "Initial words:",
+                  initial_words
+              )
+              print(
+                  "Running automatic length repair..."
+              )
+
+              length_prompt = f"""
+              Improve the following story so its spoken narration
+              naturally becomes between 105 and 180 words.
+
+              Do not create filler.
+
+              ORIGINAL STORY:
+
+              {json.dumps(
+                  story,
+                  ensure_ascii=False
+              )}
+
+              CURRENT WORD COUNT:
+              {initial_words}
+
+              Expand by improving the EXISTING STORY.
+
+              Add only useful material such as:
+
+              - concrete actions
+              - meaningful character reaction
+              - necessary context
+              - a stronger conflict
+              - a better setup
+              - a better transition to the turning point
+              - a more earned emotional payoff
+
+              Do NOT:
+
+              - create a new subplot
+              - add generic motivation
+              - add philosophical speeches
+              - add calls to action
+              - repeat information
+              - change the central premise unnecessarily
+
+              Keep the same characters and core story.
+
+              Return ONLY corrected story JSON.
+              """
+
+              story = call_groq(
+                  length_prompt,
+                  story_schema,
+                  0.55,
+                  5000
+              )
+
+          # ============================================================
+          # 3. HARD LOCAL CHECK
+          # ============================================================
+
+          validate_story_structure(story)
+
+          final_story_words = total_story_words(story)
+
+          if not MIN_FINAL_WORDS <= final_story_words <= MAX_FINAL_WORDS:
+              raise RuntimeError(
+                  f"Story after repair has "
+                  f"{final_story_words} words. "
+                  f"Allowed: {MIN_FINAL_WORDS}-{MAX_FINAL_WORDS}."
+              )
+
+          validate_story_content(story)
+
+          # ============================================================
+          # 4. FIRST QUALITY CRITIC
           # ============================================================
 
           critic_prompt = f"""
           You are a ruthless senior short-film editor.
 
-          Evaluate this proposed YouTube Short for real viewer enjoyment.
+          Evaluate this proposed YouTube Short for actual viewer enjoyment.
 
           STORY:
 
-          {json.dumps(story, ensure_ascii=False)}
+          {json.dumps(
+              story,
+              ensure_ascii=False
+          )}
 
-          Score every category from 0 to 10:
+          Score these categories from 0 to 10:
 
           - hook
           - originality
@@ -665,17 +783,19 @@ jobs:
 
           PASS only if ALL scores are at least 7.
 
-          Also fail it if there is:
+          FAIL it if there is:
+
           - a serious plot hole
           - an implausible premise
-          - an obvious/no-choice conflict
+          - an obvious conflict with no real choice
           - a disconnected reveal
           - a pasted-on moral
-          - generic AI motivational language
+          - generic motivational language
           - weak cause-and-effect
-          - a weak or predictable hook
-          - a weak ending
+          - weak hook
+          - weak ending
           - no meaningful protagonist choice
+          - major similarity to common AI story patterns
           - major repetition with the supplied recent stories
 
           Be strict.
@@ -691,44 +811,53 @@ jobs:
           )
 
           # ============================================================
-          # AUTOMATIC REPAIR
+          # 5. AUTOMATIC STORY REPAIR
           # ============================================================
 
           if not critique["pass"]:
+
               print("========================================")
-              print("⚠️ STORY FAILED FIRST QUALITY REVIEW")
+              print("⚠️ STORY FAILED QUALITY REVIEW")
               print("========================================")
+
               print(
-                  "Issues:",
                   json.dumps(
-                      critique["issues"],
-                      ensure_ascii=False
+                      critique,
+                      ensure_ascii=False,
+                      indent=2
                   )
               )
 
               repair_prompt = f"""
-              You are the final story editor.
+              You are an expert story editor.
 
-              Rewrite the supplied story to fix EVERY issue listed
-              by the critic.
+              The following story failed a professional quality review.
 
               ORIGINAL STORY:
 
-              {json.dumps(story, ensure_ascii=False)}
+              {json.dumps(
+                  story,
+                  ensure_ascii=False
+              )}
 
               CRITIC REPORT:
 
-              {json.dumps(critique, ensure_ascii=False)}
+              {json.dumps(
+                  critique,
+                  ensure_ascii=False
+              )}
 
-              Every item in the critic's "issues" list is a mandatory
-              repair requirement.
+              Every item in the critic's "issues" list is a
+              mandatory repair requirement.
 
-              FINAL QUALITY BAR:
+              REWRITE THE UNDERLYING STORY, not merely the wording.
+
+              FINAL REQUIREMENTS:
 
               - believable human situation
               - strong first line
               - specific protagonist
-              - concrete problem or goal
+              - concrete goal/problem
               - meaningful conflict
               - real choice or consequence
               - logical escalation
@@ -736,19 +865,18 @@ jobs:
               - satisfying payoff
               - ending connected to the opening
               - no fake moral
-              - no disconnected reveal
+              - no random reveal
               - no impossible premise
               - no generic motivational writing
               - no filler
-              - no calls to action
-              - naturally filmable without identifiable faces
-              - 105-405 spoken words
+              - no call to action
+              - 105-405 words
               - 7-18 scenes
+              - naturally filmable without identifiable faces
 
-              Do NOT merely rephrase weak passages.
-              Fix the underlying story.
+              Preserve the strongest original elements when they work.
 
-              Return ONLY the corrected story JSON.
+              Return ONLY corrected story JSON.
               """
 
               story = call_groq(
@@ -758,44 +886,52 @@ jobs:
                   6500
               )
 
-              word_counts, total_words = local_story_checks(
-                  story
-              )
+              validate_story_structure(story)
+              validate_story_content(story)
+
+              repaired_words = total_story_words(story)
+
+              if not MIN_FINAL_WORDS <= repaired_words <= MAX_FINAL_WORDS:
+                  raise RuntimeError(
+                      "Repaired story has invalid word count: "
+                      f"{repaired_words}"
+                  )
 
               # ========================================================
-              # SECOND CRITIC
+              # 6. FINAL QUALITY REVIEW
               # ========================================================
 
-              second_critic_prompt = f"""
+              final_critic_prompt = f"""
               Perform the FINAL publication-readiness review.
 
               STORY:
 
-              {json.dumps(story, ensure_ascii=False)}
+              {json.dumps(
+                  story,
+                  ensure_ascii=False
+              )}
 
-              Be extremely strict.
-
-              PASS requires every score to be 7 or higher and no
-              serious issue.
+              PASS only if every score is at least 7.
 
               Check especially:
 
-              1. Does the hook create curiosity immediately?
-              2. Is the protagonist's situation specific?
-              3. Is the conflict genuinely difficult?
-              4. Is the turning point caused by earlier events?
-              5. Does the ending resolve the central problem?
-              6. Does the emotional payoff feel earned?
-              7. Is the story believable?
-              8. Does it avoid generic AI motivation?
-              9. Could viewers visualize it without faces?
-              10. Is it materially different from common clichés?
+              1. Does the hook create immediate curiosity?
+              2. Is the protagonist specific?
+              3. Is the conflict genuinely meaningful?
+              4. Is there a real choice or consequence?
+              5. Does the turning point come from earlier events?
+              6. Does the ending resolve the central problem?
+              7. Is the emotional payoff earned?
+              8. Is the situation believable?
+              9. Is it visually filmable?
+              10. Does it avoid generic AI motivation?
+              11. Is the story clearly different from the channel history?
 
               Return ONLY critic JSON.
               """
 
               final_critique = call_groq(
-                  second_critic_prompt,
+                  final_critic_prompt,
                   critic_schema,
                   0.15,
                   2500
@@ -814,10 +950,11 @@ jobs:
               quality_report = final_critique
 
           else:
+
               quality_report = critique
 
           # ============================================================
-          # VISUAL PLAN
+          # 7. VISUAL PLANNING
           # ============================================================
 
           visual_schema_input = {
@@ -838,27 +975,29 @@ jobs:
               ensure_ascii=False
           )}
 
-          Create exactly one visual plan for every scene.
+          Create exactly one visual plan for every story scene.
 
-          RULES:
+          IMPORTANT:
 
-          - Every visual must directly match the narration.
+          - Every visual must directly match its narration.
           - Never invent a new event.
           - Never contradict the story.
-          - Never require a visible identifiable face.
+          - Never require an identifiable face.
           - Prefer backs, silhouettes, hands, objects, reflections,
             shadows, close-ups, wide environmental shots and
             over-the-shoulder framing.
-          - Maintain the same character clothing, props, location
-            and time of day.
+          - Maintain the same clothing, props, location and time of day.
+          - Use believable physical positions.
           - Make prompts cinematic and production-ready.
           - Specify subject, action, environment, lighting,
             mood and composition.
           - Camera movement must be physically plausible.
-          - SFX must match the action.
+          - SFX must match the visible action.
           - On-screen text should be short and used sparingly.
 
-          Return ONLY the visual-plan JSON.
+          EXACTLY match the existing scene numbers.
+
+          Return ONLY JSON matching the supplied visual schema.
           """
 
           visuals = call_groq(
@@ -868,31 +1007,37 @@ jobs:
               5000
           )
 
+          if len(visuals["scenes"]) != len(
+              story["scenes"]
+          ):
+              raise RuntimeError(
+                  "Visual scene count does not match story scene count."
+              )
+
           visual_by_number = {
               item["scene"]: item
               for item in visuals["scenes"]
           }
 
-          if len(visual_by_number) != len(story["scenes"]):
-              raise RuntimeError(
-                  "Visual scene count does not match story scene count."
-              )
-
           for scene in story["scenes"]:
-              number = scene["scene"]
 
-              if number not in visual_by_number:
+              scene_number = scene["scene"]
+
+              if scene_number not in visual_by_number:
                   raise RuntimeError(
-                      f"Missing visual plan for scene {number}."
+                      f"Missing visual plan for scene "
+                      f"{scene_number}."
                   )
 
               scene.update(
-                  visual_by_number[number]
+                  visual_by_number[scene_number]
               )
 
           # ============================================================
-          # ADAPTIVE RUNTIME
+          # 8. ADAPTIVE RUNTIME
           # ============================================================
+
+          total_words = total_story_words(story)
 
           estimated_duration = round(
               total_words /
@@ -908,7 +1053,14 @@ jobs:
               )
           )
 
-          base_duration = len(story["scenes"]) * 3
+          scene_count = len(story["scenes"])
+
+          minimum_per_scene = 3
+
+          base_duration = (
+              scene_count *
+              minimum_per_scene
+          )
 
           if base_duration > estimated_duration:
               raise RuntimeError(
@@ -921,47 +1073,60 @@ jobs:
           )
 
           weights = [
-              len(scene["narration"].split())
+              len(
+                  scene["narration"].split()
+              )
               for scene in story["scenes"]
           ]
 
           weight_sum = sum(weights)
 
-          raw = [
+          raw_extra = [
               extra_duration * weight / weight_sum
               for weight in weights
           ]
 
-          extras = [
+          extra = [
               int(value)
-              for value in raw
+              for value in raw_extra
           ]
 
           leftover = (
               extra_duration -
-              sum(extras)
+              sum(extra)
           )
 
-          order = sorted(
-              range(len(raw)),
+          remainder_order = sorted(
+              range(
+                  len(raw_extra)
+              ),
               key=lambda i:
-                  raw[i] - extras[i],
+                  raw_extra[i] - extra[i],
               reverse=True
           )
 
-          for index in order[:leftover]:
-              extras[index] += 1
+          for index in remainder_order[:leftover]:
+              extra[index] += 1
 
           durations = [
-              3 + value
-              for value in extras
+              minimum_per_scene + value
+              for value in extra
           ]
+
+          if sum(durations) != estimated_duration:
+              raise RuntimeError(
+                  "Internal duration allocation failed."
+              )
 
           for index, scene in enumerate(
               story["scenes"]
           ):
+
               scene["scene"] = index + 1
-              scene["duration_seconds"] = durations[index]
+
+              scene["duration_seconds"] = (
+                  durations[index]
+              )
 
           story["story"] = " ".join(
               scene["narration"].strip()
@@ -969,12 +1134,19 @@ jobs:
           )
 
           story["word_count"] = total_words
-          story["estimated_duration_seconds"] = estimated_duration
+
+          story["estimated_duration_seconds"] = (
+              estimated_duration
+          )
+
           story["quality_checked"] = True
-          story["quality_scores"] = quality_report
+
+          story["quality_scores"] = (
+              quality_report
+          )
 
           # ============================================================
-          # SAVE FILES
+          # 9. SAVE FINAL OUTPUT
           # ============================================================
 
           with open(
@@ -982,6 +1154,7 @@ jobs:
               "w",
               encoding="utf-8"
           ) as f:
+
               json.dump(
                   story,
                   f,
@@ -994,27 +1167,37 @@ jobs:
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(story["title"])
+
+              f.write(
+                  story["title"]
+              )
 
           with open(
               "output/script.txt",
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(story["story"])
+
+              f.write(
+                  story["story"]
+              )
 
           with open(
               "output/description.txt",
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(story["description"])
+
+              f.write(
+                  story["description"]
+              )
 
           with open(
               "output/scenes.json",
               "w",
               encoding="utf-8"
           ) as f:
+
               json.dump(
                   story["scenes"],
                   f,
@@ -1023,7 +1206,7 @@ jobs:
               )
 
           # ============================================================
-          # HISTORY
+          # 10. STORY HISTORY
           # ============================================================
 
           premise = (
@@ -1056,6 +1239,7 @@ jobs:
               "w",
               encoding="utf-8"
           ) as f:
+
               json.dump(
                   history[-50:],
                   f,
@@ -1063,19 +1247,38 @@ jobs:
                   indent=2
               )
 
+          # ============================================================
+          # FINAL LOG
+          # ============================================================
+
+          print("")
           print("========================================")
           print("✅ STORY PASSED FULL QUALITY PIPELINE")
           print("========================================")
-          print("Title:", story["title"])
-          print("Scenes:", len(story["scenes"]))
-          print("Words:", total_words)
+          print(
+              "Title:",
+              story["title"]
+          )
+          print(
+              "Scenes:",
+              len(story["scenes"])
+          )
+          print(
+              "Words:",
+              total_words
+          )
           print(
               "Estimated duration:",
               estimated_duration,
               "seconds"
           )
-          print("Durations:", durations)
-          print("Quality checked: YES")
+          print(
+              "Scene durations:",
+              durations
+          )
+          print(
+              "Quality checked: YES"
+          )
           print("========================================")
           PY
 
