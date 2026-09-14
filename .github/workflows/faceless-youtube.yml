@@ -1,25 +1,46 @@
-name: Faceless YouTube Agent
+name: DeepSeek AI Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  test:
+  test-deepseek:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Check runner
+      - name: Test DeepSeek API
+        env:
+          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
         run: |
-          echo "✅ GitHub Actions is working!"
-          echo
-          echo "CPU:"
-          nproc
-          echo
-          echo "RAM:"
-          free -h
-          echo
-          echo "Disk:"
-          df -h /
-          echo
-          echo "OS:"
-          lsb_release -a 2>/dev/null || cat /etc/os-release
+          set -e
+
+          echo "Testing DeepSeek API..."
+
+          RESPONSE=$(curl -sS https://api.deepseek.com/chat/completions \
+            -H "Content-Type: application/json" \
+            -H "Authorization: Bearer ${DEEPSEEK_API_KEY}" \
+            -d '{
+              "model": "deepseek-v4-flash",
+              "messages": [
+                {
+                  "role": "system",
+                  "content": "You are a helpful assistant."
+                },
+                {
+                  "role": "user",
+                  "content": "Reply with exactly: DeepSeek connection successful!"
+                }
+              ],
+              "thinking": {
+                "type": "disabled"
+              },
+              "stream": false,
+              "max_tokens": 50
+            }')
+
+          echo "API response:"
+          echo "$RESPONSE"
+
+          echo "$RESPONSE" | grep -q "DeepSeek connection successful!"
+
+          echo "✅ DeepSeek API test passed!"
