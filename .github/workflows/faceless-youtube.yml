@@ -1,46 +1,38 @@
-name: DeepSeek AI Test
+name: Groq AI Test
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-deepseek:
+  test-groq:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test DeepSeek API
+      - name: Test Groq API
         env:
-          DEEPSEEK_API_KEY: ${{ secrets.DEEPSEEK_API_KEY }}
+          GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           set -e
 
-          echo "Testing DeepSeek API..."
+          echo "Testing Groq API..."
 
-          RESPONSE=$(curl -sS https://api.deepseek.com/chat/completions \
+          RESPONSE=$(curl -sS https://api.groq.com/openai/v1/chat/completions \
             -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${DEEPSEEK_API_KEY}" \
+            -H "Authorization: Bearer ${GROQ_API_KEY}" \
             -d '{
-              "model": "deepseek-v4-flash",
+              "model": "openai/gpt-oss-20b",
               "messages": [
                 {
-                  "role": "system",
-                  "content": "You are a helpful assistant."
-                },
-                {
                   "role": "user",
-                  "content": "Reply with exactly: DeepSeek connection successful!"
+                  "content": "Reply with exactly: Groq connection successful!"
                 }
               ],
-              "thinking": {
-                "type": "disabled"
-              },
-              "stream": false,
-              "max_tokens": 50
+              "max_tokens": 20
             }')
 
           echo "API response:"
           echo "$RESPONSE"
 
-          echo "$RESPONSE" | grep -q "DeepSeek connection successful!"
+          echo "$RESPONSE" | grep -q "Groq connection successful!"
 
-          echo "✅ DeepSeek API test passed!"
+          echo "✅ Groq API test passed!"
