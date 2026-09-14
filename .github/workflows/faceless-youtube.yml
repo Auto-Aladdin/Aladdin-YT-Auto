@@ -49,8 +49,9 @@ jobs:
           # 2) critic
           # 3) repair/polish if needed
           # 4) final critic
-          MAX_API_CALLS = 6
+          MAX_API_CALLS = 7
           MAX_REPAIR_ROUNDS = 2
+          MIN_SECONDS_BETWEEN_CALLS = 3.0
 
           API_KEY = os.environ["GROQ_API_KEY"]
           rng = random.SystemRandom()
@@ -132,22 +133,16 @@ jobs:
           ]
 
           BANNED_PATTERNS = [
-              "child in danger",
-              "children in danger",
-              "terminal illness",
-              "hospital reveal",
-              "anonymous benefactor",
-              "lottery ticket",
-              "hidden fortune",
-              "miraculous rescue",
-              "magic rescue",
-              "missing note",
-              "missing letter",
-              "stranger was secretly",
-              "trapped in a freezer",
-              "inside a freezer",
-              "stuck in a freezer",
-              "locked inside a freezer",
+              "child in danger", "children in danger", "terminal illness", "hospital reveal",
+              "anonymous benefactor", "secret benefactor", "lottery ticket", "hidden fortune",
+              "miraculous rescue", "magic rescue", "magical", "supernatural",
+              "mysteriously appeared", "miraculously", "destiny", "fate chose",
+              "ancient box", "ancient wooden box", "only blooms when", "blooms when",
+              "special power", "meant to be", "missing note", "missing letter",
+              "secret message", "secret envelope", "stranger was secretly", "convenient stranger",
+              "sudden promotion", "instant promotion", "scathing review", "regulatory investigation",
+              "license revocation", "revoke her license", "revoke his license",
+              "trapped in a freezer", "inside a freezer", "stuck in a freezer", "locked inside a freezer",
           ]
 
           STORY_SCHEMA = {
@@ -260,6 +255,7 @@ jobs:
           ) or "NONE"
 
           api_calls = 0
+          last_call_started = 0.0
 
           def _header_float(headers, name, default):
               value = headers.get(name)
@@ -271,12 +267,17 @@ jobs:
                   return default
 
           def call_groq(prompt, schema, temperature=0.6, max_tokens=4200):
-              global api_calls
+              global api_calls, last_call_started
 
               if api_calls >= MAX_API_CALLS:
                   raise RuntimeError("Internal API-call budget exhausted.")
 
+              gap = time.time() - last_call_started
+              if gap < MIN_SECONDS_BETWEEN_CALLS:
+                  time.sleep(MIN_SECONDS_BETWEEN_CALLS - gap)
+
               api_calls += 1
+              last_call_started = time.time()
 
               payload = {
                   "model": MODEL,
@@ -410,6 +411,37 @@ jobs:
                   if len(str(story.get(field, "")).split()) < minimum_words:
                       return f"{field} is too vague."
 
+              hook_text = str(story.get("hook", "")).strip().lower()
+              first_scene = str(scenes[0].get("narration", "")).strip().lower()
+              if len(hook_text.split()) < 10:
+                  return "Hook is too short to establish a concrete unanswered question."
+
+              generic_starts = (
+                  "rain ", "the rain ", "morning ", "it was ", "the sun ",
+                  "as the sun ", "on a quiet ", "on an ordinary ", "another day ",
+                  "the shop was ",
+              )
+              if first_scene.startswith(generic_starts):
+                  return "Opening scene is too generic; start with a specific action, object, deadline, or problem."
+
+              generic_resolution_phrases = [
+                  "new beginning", "promise of renewal", "felt the weight lift",
+                  "eyes moist", "tears in her eyes", "tears in his eyes",
+                  "quiet gratitude", "new chapter", "everything changed",
+              ]
+              for phrase in generic_resolution_phrases:
+                  if phrase in text:
+                      return f"Generic emotional resolution detected: {phrase}"
+
+              if "license" in text and any(term in text for term in ("review", "regulatory", "investigation", "revoke", "renewal")):
+                  return "Artificial professional-stakes mechanism detected."
+
+              if any(term in text for term in ("blooms when", "only blooms when", "magical", "supernatural", "mysteriously", "miraculously")):
+                  return "Supernatural or magical story mechanism detected; keep the story realistic."
+
+              if "cut corners" in text and "do the right thing" in text:
+                  return "Conflict is framed as a generic moral choice instead of a specific costly dilemma."
+
               return None
 
           def make_master_prompt():
@@ -442,8 +474,13 @@ jobs:
 
           3. The obstacle is external and specific. It must force a real choice.
 
-          4. The choice must have an actual cost. "Do the right thing" by itself
-             is not a conflict.
+          4. The choice must have an actual cost. Both options must be understandable
+             to a reasonable person; avoid simple good-vs-bad moral tests.
+
+          4A. Stay completely realistic. No magic, supernatural effects, prophetic
+              objects, impossible coincidences, unexplained transformations, or
+              emotionally convenient miracles. If an object matters, its importance
+              must come from ordinary human history, evidence, skill, or practical use.
 
           5. Cause and effect must be visible: event -> choice -> consequence ->
              new problem -> turning point -> resolution.
@@ -462,8 +499,9 @@ jobs:
              child in danger, hospital reveal, terminal illness, anonymous donor,
              lottery ticket, hidden fortune, magical rescue, miraculous coincidence,
              convenient stranger, secret benefactor, missing letter/note, sudden
-             promotion because of one small action, and "doing the right thing"
-             with no concrete personal cost.
+             promotion because of one small action, supernatural objects, instant
+             forgiveness, artificial license/regulatory threats, and "doing the right"
+             thing with no concrete personal cost.
 
           10. Avoid love letters, lost-photo plots, recipe plots, bakery plots,
               violinist plots, kite plots, bus-station-departure plots, and generic
@@ -513,6 +551,15 @@ jobs:
           - predictable endings
           - common AI emotional tropes
           - visuals that are generic rather than story-specific
+          - supernatural, magical, or miracle-like mechanisms
+          - professional stakes that depend on implausible policy or instant punishment
+          - binary "lie or do the right thing" conflicts with no nuanced alternative
+          - emotional resolution that happens only because another character suddenly
+            becomes forgiving
+
+          Treat magical explanations, random coincidences, child-rescue clichés,
+          illness reveals, anonymous benefactors, implausible promotions/licenses,
+          and endings that simply reward honesty as fatal flaws.
 
           For every score below 7, explain the exact structural problem and what
           must change.
@@ -525,6 +572,12 @@ jobs:
               if local_issue:
                   issue_text.append(local_issue)
 
+              repair_directive = (
+                  "Repair the structure while preserving only genuinely strong elements."
+                  if local_issue is None
+                  else "The hard validator found a structural flaw. Replace the offending mechanism, not just its wording."
+              )
+
               return f"""
           Completely rewrite the following story into a stronger publication-ready
           short film. Do not merely polish sentences. Fix the underlying structure.
@@ -535,9 +588,13 @@ jobs:
           CRITIC ISSUES:
           {json.dumps(issue_text, ensure_ascii=False)}
 
+          REPAIR DIRECTIVE:
+          {repair_directive}
+
           REQUIREMENTS:
           - Keep only elements that are genuinely strong.
-          - Replace a weak premise rather than defending it.
+          - If major critic scores remain below 7, replace the underlying premise rather
+            than defending it. Do not merely rewrite dialogue or add sentimental language.
           - Strengthen the protagonist's specific identity and concrete goal.
           - Make the obstacle external and consequential.
           - Give the protagonist a real choice between two costly options.
@@ -667,9 +724,8 @@ jobs:
               if quality_report["pass"]:
                   break
 
-          # A healthy automated pipeline should not die merely because the
-          # critic remains conservative after the bounded repair budget.
-          # We still require all hard local checks to pass before publishing.
+          # Never silently publish a story that the professional critic rejected.
+          # The previous workflow allowed failed critic results to become artifacts.
           final_local_issue = local_story_check(story)
           if final_local_issue:
               raise RuntimeError(
@@ -678,17 +734,40 @@ jobs:
               )
 
           if not quality_report.get("pass"):
-              print("=" * 60)
-              print("QUALITY REVIEW REMAINS BELOW TARGET")
-              print("Publishing the strongest locally-valid result from the bounded repair budget.")
-              print("=" * 60)
-              print(
-                  json.dumps(
-                      quality_report,
-                      ensure_ascii=False,
-                      indent=2,
+              if api_calls < MAX_API_CALLS:
+                  print("=" * 60)
+                  print("FINAL PREMISE REBUILD")
+                  print("=" * 60)
+
+                  story = call_groq(
+                      make_repair_prompt(
+                          story,
+                          quality_report,
+                          "Final rebuild: replace the weak premise, conflict, turning point, or ending wherever necessary. Do not preserve a flawed mechanism merely for continuity.",
+                      ),
+                      STORY_SCHEMA,
+                      temperature=0.68,
+                      max_tokens=4500,
                   )
-              )
+
+                  final_local_issue = local_story_check(story)
+                  if final_local_issue:
+                      raise RuntimeError(
+                          "Final story rebuild failed local validation: "
+                          + final_local_issue
+                      )
+
+                  quality_report = dict(quality_report)
+                  quality_report["publish_gate"] = "hard-local-validation-pass-after-final-rebuild"
+                  quality_report["quality_review_note"] = (
+                      "The final rebuild passed all hard local checks, but no additional "
+                      "independent critic call remained within the bounded API budget."
+                  )
+              else:
+                  raise RuntimeError(
+                      "Story failed the publication quality gate after all bounded repair attempts: "
+                      + json.dumps(quality_report.get("issues", []), ensure_ascii=False)
+                  )
 
           # ============================================================
           # FINAL LOCAL VALIDATION + PRODUCTION DATA
@@ -803,7 +882,6 @@ jobs:
           print("Groq calls used:", api_calls)
           print("Quality:")
           print(json.dumps(quality_report, ensure_ascii=False, indent=2))
-
           PY
 
       - name: Commit story history
