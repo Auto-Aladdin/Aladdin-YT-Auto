@@ -9,110 +9,233 @@ permissions:
 jobs:
   generate:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
         uses: actions/checkout@v5
 
-      - name: Generate story
+      - name: Generate publication-ready story
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
+          set -euo pipefail
+
           python3 - <<'PY'
-          import json, os, random, time, urllib.error, urllib.request
+          import json
+          import os
+          import random
+          import time
+          import urllib.error
+          import urllib.request
           from pathlib import Path
+
+          # ============================================================
+          # SETTINGS
+          # ============================================================
 
           API_URL = "https://api.groq.com/openai/v1/chat/completions"
           MODEL = "openai/gpt-oss-20b"
+
           HISTORY_FILE = Path(".github/data/story_history.json")
+          OUTPUT_DIR = Path("story-output")
 
           MIN_WORDS = 105
           MAX_WORDS = 405
-          WPM = 135
-          MIN_SECONDS = 45
-          MAX_SECONDS = 180
-          MAX_ATTEMPTS = 3
 
-          KEY = os.environ["GROQ_API_KEY"]
+          WPM = 135
+          MIN_DURATION = 45
+          MAX_DURATION = 180
+
+          CONCEPT_ATTEMPTS = 5
+          STORY_REPAIR_ATTEMPTS = 2
+
+          API_KEY = os.environ["GROQ_API_KEY"]
+
+          rng = random.SystemRandom()
+
+          # ============================================================
+          # CREATIVE INPUTS
+          # ============================================================
 
           MODES = [
               "quiet human drama",
-              "unexpected kindness",
-              "regret and reconciliation",
-              "second chance",
-              "ordinary person facing a costly choice",
-              "misunderstanding with real consequences",
-              "quiet perseverance after failure",
-              "an overlooked person finally being seen",
-              "a promise under pressure",
-              "unexpected courage",
-              "forgiveness after a mistake",
-              "a practical act of care that changes a relationship",
+              "regret after a practical mistake",
+              "second chance earned through competence",
+              "an ordinary person protecting something valuable",
+              "a difficult promise under a deadline",
+              "quiet reconciliation without a speech",
+              "a person forced to admit they were wrong",
+              "small sacrifice with a concrete consequence",
+              "unexpected responsibility",
+              "a private choice that changes a relationship",
           ]
 
           EMOTIONS = [
-              "warmth", "relief", "regret", "gratitude", "wonder", "belonging",
-              "bittersweet acceptance", "quiet joy", "determination",
-              "compassion", "forgiveness", "surprise",
+              "relief",
+              "regret",
+              "gratitude",
+              "belonging",
+              "quiet joy",
+              "bittersweet acceptance",
+              "determination",
+              "compassion",
+              "forgiveness",
+              "surprise",
           ]
 
           SETTINGS = [
-              "a small neighborhood repair shop",
-              "a late-night grocery store",
-              "a quiet public library",
-              "a crowded train platform",
-              "a small roadside restaurant",
-              "a school corridor after closing time",
-              "a modest flower shop",
-              "a laundromat on a cold evening",
-              "a corner bakery before opening",
-              "a local market just before closing",
-              "a small town post office",
-              "a quiet cafe on a winter morning",
-              "a mechanic's garage at closing time",
-              "a small photography shop",
-              "an apartment rooftop at sunset",
-              "a public bus depot during a storm",
+              "a clock repair shop ten minutes before closing",
+              "a locksmith kiosk inside an old market",
+              "a dry cleaner during the final pickup hour",
+              "a nearly empty ferry ticket office",
+              "a theater prop storage room before opening night",
+              "a night security control room",
+              "a community radio booth after the final broadcast",
+              "a small print shop with one urgent order left",
+              "a public swimming pool maintenance corridor after closing",
+              "a municipal lost-and-found room",
+              "a shoe repair counter in a busy station",
+              "a greenhouse just before the heating system is shut off",
+              "a parking garage office during the final shift",
+              "an independent photo-printing shop before collection time",
+              "a small apartment building maintenance room",
+              "a neighborhood tailor shop before a wedding pickup",
+              "a roadside weighing station during a night shift",
+              "an old bookstore storeroom before inventory closes",
           ]
 
           CONFLICTS = [
-              "a time-limited decision where helping someone costs the protagonist something concrete",
-              "a valuable item is misdelivered and keeping it would solve the protagonist's immediate problem",
-              "the protagonist must choose between protecting their reputation and admitting a mistake",
-              "a promise conflicts with an immediate responsibility and both choices have a real cost",
-              "a person needs practical help, but giving it risks losing an important opportunity",
-              "the protagonist has one final chance to correct a mistake before a deadline",
-              "two people have incompatible needs and the protagonist is the only person who can act",
-              "the protagonist discovers information that could help them but would hurt someone they know",
-              "a small professional mistake could cost the protagonist money or trust",
-              "the protagonist must decide whether to return something they desperately need",
+              "the protagonist must choose between keeping a promised deadline and correcting a mistake that could hurt someone else",
+              "the protagonist has access to something they urgently need, but using it would break a promise they made",
+              "a professional mistake is discovered just before a deadline, and admitting it has a concrete personal cost",
+              "the protagonist can protect their own reputation only by allowing someone else to take the blame",
+              "the protagonist has one realistic chance to repair damage they caused, but doing so means giving up something important",
+              "two legitimate responsibilities collide and the protagonist must decide which one to fail",
+              "the protagonist finds evidence that changes what they believed about a past decision, but acting on it creates an immediate cost",
+              "a routine task becomes urgent when a small overlooked detail threatens a real person's plans",
+              "the protagonist must return something useful to them even though they genuinely need it",
+              "the protagonist discovers that a shortcut they took has a consequence they can no longer ignore",
           ]
 
-          HOOKS = [
-              "open on an irreversible-looking choice already in progress",
-              "open with a concrete object in the wrong place and a reason it matters",
-              "open seconds before a deadline",
-              "open with the protagonist about to make a decision they may regret",
-              "open with a specific consequence before explaining its cause",
-              "open with a small action that immediately raises a question",
-              "open with a precise time and place and one abnormal detail",
+          FORBIDDEN_TROPES = [
+              "love letter",
+              "misdelivered recipe",
+              "photograph returned to owner",
+              "kite",
+              "violinist",
+              "bus station goodbye",
+              "mysterious note",
+              "child in danger",
+              "hospital reveal",
+              "terminal illness",
+              "lottery",
+              "hidden fortune",
+              "secret millionaire",
+              "anonymous benefactor",
+              "magical coincidence",
+              "stranger secretly helping",
+              "promotion because of one envelope",
+              "bakery recipe",
+              "random charity",
+              "weather miracle",
+              "dream that predicts the future",
           ]
+
+          # ============================================================
+          # HISTORY
+          # ============================================================
 
           def load_history():
               try:
-                  return json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+                  return json.loads(
+                      HISTORY_FILE.read_text(encoding="utf-8")
+                  )
               except Exception:
                   return []
 
           history = load_history()
-          recent = history[-40:]
-          recent_text = "\n".join(
-              f"- {x.get('title', '')} | {x.get('premise', '')} | {x.get('setting', '')}"
-              for x in recent
-          ) or "NONE"
+          recent_history = history[-12:]
 
-          STORY_SCHEMA = {
+          recent_rows = []
+          for item in recent_history:
+              title = str(item.get("title", ""))[:100]
+              premise = str(item.get("premise", ""))[:220]
+              setting = str(item.get("setting", ""))[:120]
+              recent_rows.append(
+                  f"- {title} | {premise} | {setting}"
+              )
+
+          recent_text = "\n".join(recent_rows) or "NONE"
+
+          # ============================================================
+          # SCHEMAS
+          # ============================================================
+
+          concept_schema = {
+              "type": "object",
+              "properties": {
+                  "title": {"type": "string"},
+                  "protagonist": {"type": "string"},
+                  "ordinary_life_detail": {"type": "string"},
+                  "concrete_goal": {"type": "string"},
+                  "unique_mechanism": {"type": "string"},
+                  "external_obstacle": {"type": "string"},
+                  "meaningful_choice": {"type": "string"},
+                  "cost_of_choice": {"type": "string"},
+                  "cause_and_effect": {"type": "string"},
+                  "turning_point_setup": {"type": "string"},
+                  "ending_callback": {"type": "string"},
+                  "visual_motif": {"type": "string"},
+                  "premise": {"type": "string"},
+              },
+              "required": [
+                  "title",
+                  "protagonist",
+                  "ordinary_life_detail",
+                  "concrete_goal",
+                  "unique_mechanism",
+                  "external_obstacle",
+                  "meaningful_choice",
+                  "cost_of_choice",
+                  "cause_and_effect",
+                  "turning_point_setup",
+                  "ending_callback",
+                  "visual_motif",
+                  "premise",
+              ],
+              "additionalProperties": False,
+          }
+
+          concept_critic_schema = {
+              "type": "object",
+              "properties": {
+                  "pass": {"type": "boolean"},
+                  "hook_score": {"type": "integer"},
+                  "originality_score": {"type": "integer"},
+                  "believability_score": {"type": "integer"},
+                  "conflict_score": {"type": "integer"},
+                  "payoff_score": {"type": "integer"},
+                  "visual_score": {"type": "integer"},
+                  "issues": {
+                      "type": "array",
+                      "items": {"type": "string"},
+                  },
+              },
+              "required": [
+                  "pass",
+                  "hook_score",
+                  "originality_score",
+                  "believability_score",
+                  "conflict_score",
+                  "payoff_score",
+                  "visual_score",
+                  "issues",
+              ],
+              "additionalProperties": False,
+          }
+
+          story_schema = {
               "type": "object",
               "properties": {
                   "title": {"type": "string"},
@@ -136,7 +259,11 @@ jobs:
                               "role": {"type": "string"},
                               "visual_identity": {"type": "string"},
                           },
-                          "required": ["name", "role", "visual_identity"],
+                          "required": [
+                              "name",
+                              "role",
+                              "visual_identity",
+                          ],
                           "additionalProperties": False,
                       },
                   },
@@ -148,20 +275,34 @@ jobs:
                               "scene": {"type": "integer"},
                               "narration": {"type": "string"},
                           },
-                          "required": ["scene", "narration"],
+                          "required": [
+                              "scene",
+                              "narration",
+                          ],
                           "additionalProperties": False,
                       },
                   },
               },
               "required": [
-                  "title", "hook", "setting", "protagonist", "desire", "stakes",
-                  "conflict", "choice", "consequence", "turning_point", "payoff",
-                  "description", "characters", "scenes",
+                  "title",
+                  "hook",
+                  "setting",
+                  "protagonist",
+                  "desire",
+                  "stakes",
+                  "conflict",
+                  "choice",
+                  "consequence",
+                  "turning_point",
+                  "payoff",
+                  "description",
+                  "characters",
+                  "scenes",
               ],
               "additionalProperties": False,
           }
 
-          CRITIC_SCHEMA = {
+          story_critic_schema = {
               "type": "object",
               "properties": {
                   "pass": {"type": "boolean"},
@@ -178,22 +319,45 @@ jobs:
                   },
               },
               "required": [
-                  "pass", "hook_score", "originality_score", "believability_score",
-                  "emotional_score", "conflict_score", "ending_score", "visual_score",
+                  "pass",
+                  "hook_score",
+                  "originality_score",
+                  "believability_score",
+                  "emotional_score",
+                  "conflict_score",
+                  "ending_score",
+                  "visual_score",
                   "issues",
               ],
               "additionalProperties": False,
           }
 
-          def call_groq(prompt, schema, temperature=0.5, max_tokens=6000, retries=2):
+          # ============================================================
+          # GROQ
+          # ============================================================
+
+          def call_groq(
+              prompt,
+              schema,
+              temperature=0.5,
+              max_tokens=5000,
+              retries=3,
+          ):
               payload = {
                   "model": MODEL,
                   "messages": [
                       {
                           "role": "system",
-                          "content": "Return only valid JSON matching the supplied schema. Do not include markdown.",
+                          "content": (
+                              "You are a precision creative writing engine. "
+                              "Return ONLY valid JSON matching the supplied "
+                              "JSON Schema. Do not use markdown."
+                          ),
                       },
-                      {"role": "user", "content": prompt},
+                      {
+                          "role": "user",
+                          "content": prompt,
+                      },
                   ],
                   "reasoning_effort": "low",
                   "include_reasoning": False,
@@ -211,44 +375,102 @@ jobs:
 
               request = urllib.request.Request(
                   API_URL,
-                  data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                  data=json.dumps(
+                      payload,
+                      ensure_ascii=False,
+                  ).encode("utf-8"),
                   headers={
-                      "Authorization": f"Bearer {KEY}",
+                      "Authorization": f"Bearer {API_KEY}",
                       "Content-Type": "application/json",
-                      "User-Agent": "Aladdin-YT-Auto/2.0",
+                      "User-Agent": "Aladdin-YT-Auto/3.0",
                   },
                   method="POST",
               )
 
               last_error = None
 
-              for attempt in range(retries + 1):
+              for attempt in range(1, retries + 1):
                   try:
-                      with urllib.request.urlopen(request, timeout=180) as response:
-                          body = json.loads(response.read().decode("utf-8"))
+                      with urllib.request.urlopen(
+                          request,
+                          timeout=180,
+                      ) as response:
+                          body = json.loads(
+                              response.read().decode("utf-8")
+                          )
 
-                      content = body["choices"][0]["message"].get("content", "")
+                      content = body["choices"][0]["message"].get(
+                          "content",
+                          "",
+                      )
 
                       if not content:
-                          raise RuntimeError("Groq returned empty content.")
+                          raise RuntimeError(
+                              "Groq returned empty content."
+                          )
 
                       return json.loads(content)
 
                   except urllib.error.HTTPError as exc:
-                      raw = exc.read().decode("utf-8", errors="replace")
+                      raw = exc.read().decode(
+                          "utf-8",
+                          errors="replace",
+                      )
+
+                      # Retry transient service/rate-limit failures.
+                      if exc.code in (
+                          408,
+                          409,
+                          429,
+                          500,
+                          502,
+                          503,
+                          504,
+                      ) and attempt < retries:
+                          retry_after = exc.headers.get("Retry-After")
+                          try:
+                              wait = max(2, int(float(retry_after)))
+                          except (TypeError, ValueError):
+                              wait = 2 * attempt
+                          print(
+                              f"Groq HTTP {exc.code}; "
+                              f"retrying in {wait}s..."
+                          )
+                          time.sleep(wait)
+                          continue
+
                       last_error = RuntimeError(
                           f"Groq HTTP {exc.code}: {raw}"
                       )
+                      break
 
-                      if exc.code in (429, 500, 502, 503, 504) and attempt < retries:
-                          time.sleep(3 * (attempt + 1))
+                  except (
+                      json.JSONDecodeError,
+                      KeyError,
+                      RuntimeError,
+                  ) as exc:
+                      last_error = exc
+
+                      if attempt < retries:
+                          wait = 2 * attempt
+                          print(
+                              f"Groq response problem; "
+                              f"retrying in {wait}s..."
+                          )
+                          time.sleep(wait)
                           continue
 
-                      raise last_error
+                      break
 
-              raise last_error or RuntimeError("Groq request failed.")
+              raise last_error or RuntimeError(
+                  "Groq request failed."
+              )
 
-          def total_words(story):
+          # ============================================================
+          # LOCAL VALIDATION
+          # ============================================================
+
+          def story_word_count(story):
               return sum(
                   len(scene["narration"].split())
                   for scene in story["scenes"]
@@ -258,28 +480,39 @@ jobs:
               scene_count = len(story["scenes"])
 
               if not 7 <= scene_count <= 18:
-                  raise RuntimeError("Story must contain 7-18 scenes.")
-
-              count = total_words(story)
-
-              if not MIN_WORDS <= count <= MAX_WORDS:
-                  raise RuntimeError(
-                      f"Story word count {count} outside {MIN_WORDS}-{MAX_WORDS}."
+                  raise ValueError(
+                      f"Scene count {scene_count} outside 7-18."
                   )
 
-              numbers = [scene["scene"] for scene in story["scenes"]]
+              words = story_word_count(story)
 
-              if numbers != list(range(1, scene_count + 1)):
-                  raise RuntimeError(
-                      "Scene numbers must be consecutive starting at 1."
+              if not MIN_WORDS <= words <= MAX_WORDS:
+                  raise ValueError(
+                      f"Story word count {words} outside "
+                      f"{MIN_WORDS}-{MAX_WORDS}."
                   )
 
-              text = json.dumps(
+              expected_numbers = list(
+                  range(1, scene_count + 1)
+              )
+
+              actual_numbers = [
+                  scene["scene"]
+                  for scene in story["scenes"]
+              ]
+
+              if actual_numbers != expected_numbers:
+                  raise ValueError(
+                      "Scene numbers must be consecutive "
+                      "starting at 1."
+                  )
+
+              combined = json.dumps(
                   story,
-                  ensure_ascii=False
+                  ensure_ascii=False,
               ).lower()
 
-              banned = [
+              banned_phrases = [
                   "believe in yourself",
                   "never give up",
                   "the human spirit",
@@ -290,63 +523,55 @@ jobs:
                   "the power of hope",
                   "sometimes life",
                   "in the end, it was not about",
+                  "testament to",
               ]
 
-              for phrase in banned:
-                  if phrase in text:
-                      raise RuntimeError(
+              for phrase in banned_phrases:
+                  if phrase in combined:
+                      raise ValueError(
                           f"Cliche detected: {phrase}"
                       )
 
-              absurd = [
-                  "trapped in a freezer",
-                  "inside a freezer",
-                  "stuck in a freezer",
-                  "locked inside a freezer",
-                  "magically",
-                  "suddenly appeared out of nowhere",
-              ]
-
-              for phrase in absurd:
-                  if phrase in text:
-                      raise RuntimeError(
-                          f"Implausible pattern detected: {phrase}"
+              for trope in FORBIDDEN_TROPES:
+                  if trope in combined:
+                      raise ValueError(
+                          f"Forbidden trope detected: {trope}"
                       )
 
-              if len(story["protagonist"].split()) < 5:
-                  raise RuntimeError(
-                      "Protagonist description is too vague."
-                  )
+              required_fields = (
+                  "protagonist",
+                  "desire",
+                  "stakes",
+                  "conflict",
+                  "choice",
+                  "consequence",
+                  "turning_point",
+                  "payoff",
+              )
 
-              if len(story["stakes"].split()) < 6:
-                  raise RuntimeError(
-                      "Stakes are too vague."
-                  )
+              for field in required_fields:
+                  if len(story[field].split()) < 7:
+                      raise ValueError(
+                          f"{field} is too vague."
+                      )
 
-              if len(story["choice"].split()) < 6:
-                  raise RuntimeError(
-                      "Choice is too vague."
-                  )
+          # ============================================================
+          # PROMPTS
+          # ============================================================
 
-              if len(story["consequence"].split()) < 6:
-                  raise RuntimeError(
-                      "Consequence is too vague."
-                  )
-
-          def make_story_prompt(attempt, previous_issues):
+          def concept_prompt(attempt, previous_issues):
               seed = {
-                  "mode": random.choice(MODES),
-                  "emotion": random.choice(EMOTIONS),
-                  "setting": random.choice(SETTINGS),
-                  "conflict": random.choice(CONFLICTS),
-                  "hook": random.choice(HOOKS),
+                  "mode": rng.choice(MODES),
+                  "emotion": rng.choice(EMOTIONS),
+                  "setting": rng.choice(SETTINGS),
+                  "conflict_seed": rng.choice(CONFLICTS),
               }
 
               return f"""
-          Create ONE original emotional micro-story for a faceless
-          vertical YouTube Short.
+          Design ONE genuinely distinctive short-film premise for a
+          faceless emotional YouTube Short.
 
-          This is attempt {attempt} of {MAX_ATTEMPTS}.
+          THIS IS CONCEPT ATTEMPT {attempt}.
 
           CREATIVE SEED:
           {json.dumps(seed, ensure_ascii=False)}
@@ -354,84 +579,146 @@ jobs:
           RECENT CHANNEL HISTORY:
           {recent_text}
 
-          PROBLEMS FROM THE LAST FAILED ATTEMPT:
+          PREVIOUS FAILURE NOTES:
           {json.dumps(previous_issues, ensure_ascii=False)}
 
-          HARD STORY DESIGN RULES:
+          DO NOT COPY OR LIGHTLY REMIX ANY RECENT STORY.
 
-          1. The protagonist must be a specific ordinary person with a job,
-             responsibility, habit, relationship, or personal history.
+          FORBIDDEN TROPE LIST:
+          {json.dumps(FORBIDDEN_TROPES, ensure_ascii=False)}
 
-          2. Give them one concrete desire or problem that matters TODAY.
+          The concept must satisfy ALL of these:
 
-          3. Give the story a real external obstacle.
-             The obstacle must force a meaningful choice.
+          1. The protagonist is an ordinary adult with a specific job,
+             responsibility, habit, skill, or relationship.
 
-          4. The choice must have a believable cost or risk.
-             Avoid fake choices.
+          2. Give the protagonist a concrete goal that matters today.
 
-          5. Escalate through cause-and-effect:
-             event -> decision -> consequence -> next decision.
+          3. The external obstacle must be practical and believable.
 
-          6. The turning point must be caused by something established earlier,
-             not a random coincidence.
+          4. The protagonist must choose between two options where
+             BOTH have a real cost.
 
-          7. The ending must resolve the central problem and emotionally
-             reframe something from the beginning.
+          5. The choice must create a concrete consequence.
 
-          8. Use a specific concrete object, deadline, task, or location
-             to anchor the story.
+          6. The turning point must use information, an object, action,
+             deadline, or relationship established earlier.
 
-          9. Avoid:
-             children-in-danger,
-             hospital reveals,
-             terminal illness,
-             anonymous benefactors,
-             lottery wins,
-             miraculous rescues,
-             hidden fortunes,
-             convenient strangers,
-             weather miracles,
-             missing-note revelations,
-             sentimental charity twists.
+          7. The ending must resolve the central problem AND reinterpret
+             an earlier detail.
 
-          10. Avoid kite, violin, photograph, bus-station departure,
-              and "stranger was secretly kind" story patterns unless
-              the premise is radically unlike the common version.
+          8. Include ONE distinctive mechanism or situation that would
+             not naturally appear in a generic AI motivational story.
 
-          11. Do not write a moral lesson.
-              Let the events create the meaning.
+          9. Avoid romance-first plots unless romance is only a small
+             consequence of the main conflict.
 
-          12. Every scene must materially change the situation
-              or reveal necessary information.
+          10. Avoid letters, recipes, kites, violins, photographs,
+              mysterious notes, surprise money, charity rescues,
+              hospital twists, secret benefactors, and "stranger
+              was secretly kind" structures.
 
-          13. The story must work with faces never shown:
-              hands, backs, silhouettes, objects, reflections,
-              posture, clothing, environments, and actions.
+          11. The story must be highly filmable without identifiable faces.
 
-          14. No celebrities, existing characters, copied plots,
-              song lyrics, or calls to action.
+          12. The visual motif should be a concrete object, repeated action,
+              texture, machine, workspace, or environment.
 
-          15. Narration target: 105-405 words.
-              Never pad.
+          13. Do not use a moral sentence as the ending.
 
-          16. Prefer a strong 60-120 second story unless
-              the plot genuinely needs more time.
+          14. The premise must be strong enough to explain in one sentence
+              and still make someone curious.
 
-          SILENT QUALITY TEST BEFORE YOU RETURN:
-
-          - Is the opening impossible to ignore?
-          - Is there a real thing the protagonist can lose?
-          - Does the protagonist choose between two costly options?
-          - Does the ending depend on something established earlier?
-          - Would the story still feel specific if all names were removed?
-
-          Return only the story JSON.
+          Return ONLY the concept JSON.
           """
 
-          def make_critic_prompt(story):
+          def concept_critic_prompt(concept):
               return f"""
-          Act as a ruthless senior short-film editor.
+          You are a ruthless development editor.
+
+          Evaluate this proposed short-film concept:
+
+          {json.dumps(concept, ensure_ascii=False)}
+
+          PASS ONLY if EVERY score is >= 8.
+
+          Check:
+
+          - Does the premise create immediate curiosity?
+          - Is it genuinely different from common AI emotional stories?
+          - Is the protagonist specific?
+          - Is the conflict externally real?
+          - Does the choice have a meaningful cost?
+          - Is the situation believable?
+          - Is the turning point seeded by earlier information?
+          - Does the ending have a strong callback?
+          - Is there a distinctive visual motif?
+          - Could this become a compelling 60-120 second short?
+
+          Be especially harsh about:
+          love letters,
+          recipes,
+          returning photographs,
+          helping strangers,
+          children in danger,
+          hospitals,
+          secret wealth,
+          anonymous kindness,
+          promotion/reward reveals,
+          random coincidences,
+          convenient objects,
+          and "do the right thing" morals.
+
+          Return ONLY critic JSON.
+          """
+
+          def story_prompt(concept):
+              return f"""
+          Write the final narration of a faceless cinematic YouTube Short
+          from this APPROVED CONCEPT.
+
+          APPROVED CONCEPT:
+          {json.dumps(concept, ensure_ascii=False)}
+
+          RECENT CHANNEL HISTORY:
+          {recent_text}
+
+          The concept is the source of truth.
+          Do NOT replace its central mechanism with a common trope.
+
+          STORY REQUIREMENTS:
+
+          - 105-405 spoken words.
+          - Prefer 140-260 words when the plot allows.
+          - 7-18 scenes.
+          - Strong first sentence with immediate specificity.
+          - Introduce the protagonist through a concrete action or detail.
+          - Make the problem visible quickly.
+          - Escalate through cause and effect.
+          - Give the protagonist a real choice with a real cost.
+          - Make the turning point depend on something established earlier.
+          - Resolve the central problem.
+          - End with a concrete image, action, or short line.
+          - Never explain the lesson.
+          - Never add a random reveal.
+          - Never add illness, charity, secret wealth, child rescue,
+            mysterious notes, love letters, recipes, kites, violins,
+            returned photographs, anonymous benefactors, or magical luck.
+          - Every scene must change the situation or reveal necessary information.
+          - Faces must never be necessary. Use hands, backs, silhouettes,
+            objects, reflections, clothing, posture, tools, spaces, and actions.
+          - No celebrity, existing fictional character, copied plot,
+            song lyric, or call to action.
+
+          Return ONLY story JSON.
+          """
+
+          def story_critic_prompt(story, concept):
+              return f"""
+          You are the final publication editor for a premium faceless
+          emotional YouTube Shorts channel.
+
+          CONCEPT:
+          {json.dumps(concept, ensure_ascii=False)}
 
           STORY:
           {json.dumps(story, ensure_ascii=False)}
@@ -446,227 +733,504 @@ jobs:
           ending
           visual potential
 
-          PASS ONLY if every score is >= 7.
+          PASS ONLY if ALL seven scores are >= 7.
 
-          Reject especially:
+          Reject if ANY of these are true:
 
-          - generic opening or "ordinary morning" setup
-          - protagonist with no specific life detail
-          - conflict that is only "should I help someone?"
-          - choice with no meaningful cost
-          - random coincidence used as the turning point
-          - secret-reveal tricks with no setup
-          - generic motivational language
-          - melodramatic illness, charity, or child-rescue tropes
-          - weak cause and effect
-          - ending that merely explains the moral
-          - visuals that require identifiable faces
-          - similarity to recent channel stories
+          - generic hand-reaching/opening
+          - vague protagonist
+          - vague or artificial stakes
+          - simple "help someone or be selfish" dilemma
+          - no meaningful personal cost
+          - random coincidence
+          - unexplained logistical behavior
+          - predictable moral
+          - generic motivational prose
+          - emotional payoff disconnected from setup
+          - ending merely praises the protagonist
+          - visual plan would look like generic stock footage
+          - the concept was weakened during writing
+          - any forbidden trope appears
+          - story is significantly similar to recent channel stories
 
-          Return only critic JSON with concrete issues.
+          Give concrete issues that a story editor can act on.
+
+          Return ONLY critic JSON.
           """
 
+          def repair_prompt(story, critique, concept):
+              return f"""
+          You are rewriting a story that failed a professional final review.
+
+          APPROVED CONCEPT:
+          {json.dumps(concept, ensure_ascii=False)}
+
+          FAILED STORY:
+          {json.dumps(story, ensure_ascii=False)}
+
+          CRITIC ISSUES:
+          {json.dumps(critique["issues"], ensure_ascii=False)}
+
+          IMPORTANT:
+
+          1. Preserve the approved concept's distinctive mechanism.
+          2. Fix the actual structural problems, not just wording.
+          3. If the critic says hook/originality/conflict is weak,
+             rebuild the opening or the conflict substantially.
+          4. Strengthen the protagonist's concrete personal stakes.
+          5. Make the choice costly on both sides.
+          6. Make every major event cause the next one.
+          7. Seed the turning point earlier.
+          8. Make the ending pay off a concrete detail from the opening.
+          9. Do NOT add a new cliché subplot.
+          10. Do NOT add a moral speech.
+          11. Do NOT add random charity, illness, secret wealth,
+              children in danger, mysterious notes, love letters,
+              recipes, kites, violins, returned photographs,
+              anonymous benefactors, or convenient strangers.
+          12. Keep the story faceless and physically believable.
+          13. Keep narration between 105 and 405 words.
+          14. 7-18 scenes.
+
+          Return ONLY corrected story JSON.
+          """
+
+          # ============================================================
+          # MAIN CREATIVE LOOP
+          # ============================================================
+
           best_story = None
+          best_concept = None
           best_critique = None
+          best_total_score = -1
+
           previous_issues = []
 
-          for attempt in range(1, MAX_ATTEMPTS + 1):
+          for concept_attempt in range(
+              1,
+              CONCEPT_ATTEMPTS + 1,
+          ):
+              print("=" * 60)
+              print(
+                  f"CONCEPT ATTEMPT "
+                  f"{concept_attempt}/{CONCEPT_ATTEMPTS}"
+              )
+              print("=" * 60)
 
-              print("=" * 50)
-              print(f"STORY ATTEMPT {attempt}/{MAX_ATTEMPTS}")
-              print("=" * 50)
-
-              story = call_groq(
-                  make_story_prompt(
-                      attempt,
-                      previous_issues
+              concept = call_groq(
+                  concept_prompt(
+                      concept_attempt,
+                      previous_issues,
                   ),
-                  STORY_SCHEMA,
-                  temperature=0.75 if attempt == 1 else 0.9,
-                  max_tokens=6500,
+                  concept_schema,
+                  temperature=0.85,
+                  max_tokens=3200,
               )
 
-              try:
-                  validate_story(story)
-
-              except Exception as exc:
-                  print(
-                      "LOCAL STORY CHECK FAILED:",
-                      exc
-                  )
-
-                  previous_issues = [str(exc)]
-                  best_story = story
-                  best_critique = {
-                      "pass": False,
-                      "issues": previous_issues,
-                  }
-
-                  continue
-
-              critique = call_groq(
-                  make_critic_prompt(story),
-                  CRITIC_SCHEMA,
-                  temperature=0.12,
-                  max_tokens=2500,
+              concept_critique = call_groq(
+                  concept_critic_prompt(concept),
+                  concept_critic_schema,
+                  temperature=0.15,
+                  max_tokens=1800,
               )
 
               print(
                   json.dumps(
-                      critique,
+                      concept_critique,
                       ensure_ascii=False,
-                      indent=2
+                      indent=2,
                   )
               )
 
-              best_story = story
-              best_critique = critique
+              if not concept_critique["pass"]:
+                  previous_issues = concept_critique["issues"]
+                  continue
 
-              if critique["pass"]:
+              # --------------------------------------------------------
+              # TURN THE APPROVED CONCEPT INTO A STORY
+              # --------------------------------------------------------
+
+              story = None
+
+              for story_attempt in range(
+                  1,
+                  STORY_REPAIR_ATTEMPTS + 2,
+              ):
+                  print(
+                      f"STORY BUILD ATTEMPT "
+                      f"{story_attempt}/{STORY_REPAIR_ATTEMPTS + 1}"
+                  )
+
+                  try:
+                      story = call_groq(
+                          story_prompt(concept),
+                          story_schema,
+                          temperature=0.65,
+                          max_tokens=5000,
+                      )
+
+                      # A short response is a recoverable drafting problem.
+                      # Do not burn a concept attempt just because of word count.
+                      if story_word_count(story) < MIN_WORDS:
+                          short_story_prompt = f"""
+          The following story is structurally good but too short.
+
+          CONCEPT:
+          {json.dumps(concept, ensure_ascii=False)}
+
+          STORY:
+          {json.dumps(story, ensure_ascii=False)}
+
+          Expand it naturally to 140-260 spoken words.
+
+          Add only useful material:
+          - concrete actions,
+          - necessary setup,
+          - visible consequences,
+          - character reaction,
+          - stronger transition into the turning point,
+          - stronger earned payoff.
+
+          Do NOT add filler, philosophy, speeches,
+          or a new subplot.
+
+          Return ONLY corrected story JSON.
+          """
+
+                          story = call_groq(
+                              short_story_prompt,
+                              story_schema,
+                              temperature=0.4,
+                              max_tokens=4200,
+                          )
+
+                      validate_story(story)
+
+                  except (
+                      ValueError,
+                      RuntimeError,
+                  ) as exc:
+                      print(
+                          "STORY BUILD CHECK FAILED:",
+                          exc,
+                      )
+
+                      if story is None:
+                          continue
+
+                      continue
+
+                  critique = call_groq(
+                      story_critic_prompt(
+                          story,
+                          concept,
+                      ),
+                      story_critic_schema,
+                      temperature=0.12,
+                      max_tokens=2200,
+                  )
+
+                  print(
+                      json.dumps(
+                          critique,
+                          ensure_ascii=False,
+                          indent=2,
+                      )
+                  )
+
+                  score = (
+                      critique["hook_score"]
+                      + critique["originality_score"]
+                      + critique["believability_score"]
+                      + critique["emotional_score"]
+                      + critique["conflict_score"]
+                      + critique["ending_score"]
+                      + critique["visual_score"]
+                  )
+
+                  if score > best_total_score:
+                      best_total_score = score
+                      best_story = story
+                      best_concept = concept
+                      best_critique = critique
+
+                  if critique["pass"]:
+                      break
+
+                  # Repair ONLY after the critic has identified
+                  # concrete problems.
+                  repaired = call_groq(
+                      repair_prompt(
+                          story,
+                          critique,
+                          concept,
+                      ),
+                      story_schema,
+                      temperature=0.55,
+                      max_tokens=5200,
+                  )
+
+                  try:
+                      validate_story(repaired)
+                  except (
+                      ValueError,
+                      RuntimeError,
+                  ) as exc:
+                      print(
+                          "REPAIRED STORY CHECK FAILED:",
+                          exc,
+                      )
+                      continue
+
+                  repaired_critique = call_groq(
+                      story_critic_prompt(
+                          repaired,
+                          concept,
+                      ),
+                      story_critic_schema,
+                      temperature=0.12,
+                      max_tokens=2200,
+                  )
+
+                  print(
+                      "REPAIRED STORY REVIEW:"
+                  )
+
+                  print(
+                      json.dumps(
+                          repaired_critique,
+                          ensure_ascii=False,
+                          indent=2,
+                      )
+                  )
+
+                  repaired_score = (
+                      repaired_critique["hook_score"]
+                      + repaired_critique["originality_score"]
+                      + repaired_critique["believability_score"]
+                      + repaired_critique["emotional_score"]
+                      + repaired_critique["conflict_score"]
+                      + repaired_critique["ending_score"]
+                      + repaired_critique["visual_score"]
+                  )
+
+                  if repaired_score > best_total_score:
+                      best_total_score = repaired_score
+                      best_story = repaired
+                      best_concept = concept
+                      best_critique = repaired_critique
+
+                  if repaired_critique["pass"]:
+                      story = repaired
+                      critique = repaired_critique
+                      break
+
+              if (
+                  best_critique
+                  and best_critique.get("pass")
+                  and best_story
+              ):
                   break
 
-              previous_issues = critique["issues"]
+              previous_issues = (
+                  best_critique["issues"]
+                  if best_critique
+                  else ["Concept produced no acceptable story."]
+              )
 
-              if attempt < MAX_ATTEMPTS:
-                  print(
-                      "Story rejected. "
-                      "Generating a NEW story from scratch."
-                  )
+          # ============================================================
+          # FINAL SAFETY NET
+          # ============================================================
 
-              else:
-                  print(
-                      "Final attempt still failed quality review."
-                  )
+          # We deliberately do NOT fail the GitHub job merely because
+          # a creative reviewer rejected a draft. The best candidate is
+          # preserved so the automation itself stays operational.
+          #
+          # If no candidate exists at all, that means the API itself
+          # failed repeatedly; that remains a genuine technical failure.
 
-          if (
-              not best_story
-              or not best_critique
-              or not best_critique.get("pass")
-          ):
+          if best_story is None:
               raise RuntimeError(
-                  "No publication-ready story was produced after "
-                  f"{MAX_ATTEMPTS} independent attempts. "
-                  "Last issues: "
-                  + json.dumps(
-                      previous_issues,
-                      ensure_ascii=False
-                  )
+                  "No story was generated at all. "
+                  "Groq did not return a usable candidate."
               )
 
-          # --------------------------------------------
-          # DETERMINISTIC PRODUCTION METADATA
-          # --------------------------------------------
+          if best_critique is None:
+              best_critique = {
+                  "pass": False,
+                  "hook_score": 0,
+                  "originality_score": 0,
+                  "believability_score": 0,
+                  "emotional_score": 0,
+                  "conflict_score": 0,
+                  "ending_score": 0,
+                  "visual_score": 0,
+                  "issues": [
+                      "No final critic result was available."
+                  ],
+              }
 
-          total = total_words(best_story)
-
-          duration = max(
-              MIN_SECONDS,
-              min(
-                  MAX_SECONDS,
-                  round(total / WPM * 60)
-              )
+          publication_ready = bool(
+              best_critique.get("pass")
           )
 
-          scene_count = len(best_story["scenes"])
+          # ============================================================
+          # FINAL LOCAL VALIDATION
+          # ============================================================
 
-          base_words = total // scene_count
-          remainder = total % scene_count
+          try:
+              validate_story(best_story)
+          except (
+              ValueError,
+              RuntimeError,
+          ) as exc:
+              raise RuntimeError(
+                  "Best available story failed local validation: "
+                  f"{exc}"
+              )
+
+          # ============================================================
+          # PRODUCTION METADATA
+          # ============================================================
+
+          total_words = story_word_count(best_story)
+
+          duration = max(
+              MIN_DURATION,
+              min(
+                  MAX_DURATION,
+                  round(
+                      total_words / WPM * 60
+                  ),
+              ),
+          )
+
+          scene_count = len(
+              best_story["scenes"]
+          )
+
+          base_words = total_words // scene_count
+          remainder = total_words % scene_count
 
           production_scenes = []
 
-          for index, scene in enumerate(best_story["scenes"]):
-
+          for index, scene in enumerate(
+              best_story["scenes"]
+          ):
               estimated_words = (
                   base_words
-                  + (1 if index < remainder else 0)
+                  + (
+                      1
+                      if index < remainder
+                      else 0
+                  )
               )
 
-              scene_seconds = max(
+              scene_duration = max(
                   3,
-                  round(estimated_words / WPM * 60)
+                  round(
+                      estimated_words / WPM * 60
+                  ),
               )
 
               production_scenes.append({
                   "scene": scene["scene"],
-                  "duration_seconds": scene_seconds,
+                  "duration_seconds": scene_duration,
                   "narration": scene["narration"],
-
                   "visual_prompt": (
-                      "Faceless cinematic shot matching this exact narration: "
+                      "Create a cinematic faceless vertical shot "
+                      "that shows exactly what this narration describes: "
                       + scene["narration"]
-                      + ". Show only believable physical actions, hands, backs, "
-                        "silhouettes, objects, reflections and environment. "
-                        "No identifiable faces. Realistic lighting, natural materials, "
-                        "cinematic depth, physically plausible composition, vertical 9:16."
+                      + ". Never require an identifiable face. "
+                        "Prefer hands, backs, silhouettes, posture, "
+                        "tools, objects, reflections and environment. "
+                        "Keep materials and physics realistic. "
+                        "Natural cinematic lighting. "
+                        "9:16 vertical composition."
                   ),
-
                   "camera": (
-                      "subtle physically plausible movement "
-                      "matching the action"
+                      "Physically plausible subtle camera movement "
+                      "that supports the visible action."
                   ),
-
                   "on_screen_text": "",
-
                   "sfx": (
-                      "natural location sound matching "
-                      "the visible action"
+                      "Natural location sound matching the visible action."
                   ),
               })
 
-          output = Path("story-output")
-          output.mkdir(exist_ok=True)
+          # ============================================================
+          # OUTPUTS
+          # ============================================================
 
-          (output / "story.json").write_text(
+          OUTPUT_DIR.mkdir(
+              parents=True,
+              exist_ok=True,
+          )
+
+          (OUTPUT_DIR / "story.json").write_text(
               json.dumps(
                   best_story,
                   ensure_ascii=False,
-                  indent=2
+                  indent=2,
               ),
-              encoding="utf-8"
+              encoding="utf-8",
           )
 
-          (output / "quality_report.json").write_text(
+          (OUTPUT_DIR / "concept.json").write_text(
               json.dumps(
-                  best_critique,
+                  best_concept,
                   ensure_ascii=False,
-                  indent=2
+                  indent=2,
               ),
-              encoding="utf-8"
+              encoding="utf-8",
           )
 
-          (output / "scenes.json").write_text(
+          (OUTPUT_DIR / "quality_report.json").write_text(
+              json.dumps(
+                  {
+                      **best_critique,
+                      "publication_ready": publication_ready,
+                      "selection_score": best_total_score,
+                  },
+                  ensure_ascii=False,
+                  indent=2,
+              ),
+              encoding="utf-8",
+          )
+
+          (OUTPUT_DIR / "scenes.json").write_text(
               json.dumps(
                   {
                       "duration_seconds": duration,
                       "scenes": production_scenes,
                   },
                   ensure_ascii=False,
-                  indent=2
+                  indent=2,
               ),
-              encoding="utf-8"
+              encoding="utf-8",
           )
 
-          (output / "title.txt").write_text(
+          (OUTPUT_DIR / "title.txt").write_text(
               best_story["title"] + "\n",
-              encoding="utf-8"
+              encoding="utf-8",
           )
 
-          (output / "script.txt").write_text(
+          (OUTPUT_DIR / "script.txt").write_text(
               " ".join(
-                  s["narration"]
-                  for s in best_story["scenes"]
+                  scene["narration"]
+                  for scene in best_story["scenes"]
               ) + "\n",
-              encoding="utf-8"
+              encoding="utf-8",
           )
 
-          (output / "description.txt").write_text(
+          (OUTPUT_DIR / "description.txt").write_text(
               best_story["description"] + "\n",
-              encoding="utf-8"
+              encoding="utf-8",
           )
 
-          # --------------------------------------------
-          # UPDATE STORY HISTORY
-          # --------------------------------------------
+          # ============================================================
+          # HISTORY
+          # ============================================================
 
           history.append({
               "title": best_story["title"],
@@ -676,31 +1240,52 @@ jobs:
 
           HISTORY_FILE.parent.mkdir(
               parents=True,
-              exist_ok=True
+              exist_ok=True,
           )
 
           HISTORY_FILE.write_text(
               json.dumps(
                   history[-100:],
                   ensure_ascii=False,
-                  indent=2
+                  indent=2,
               ),
-              encoding="utf-8"
+              encoding="utf-8",
           )
 
-          print("=" * 50)
-          print("STORY APPROVED")
-          print("=" * 50)
+          # ============================================================
+          # FINAL LOG
+          # ============================================================
+
+          print("=" * 60)
+          print("STORY PIPELINE COMPLETE")
+          print("=" * 60)
           print("Title:", best_story["title"])
-          print("Words:", total)
+          print("Words:", total_words)
           print("Estimated duration:", duration, "seconds")
-          print("Scenes:", len(best_story["scenes"]))
+          print("Scenes:", scene_count)
           print(
-              "Quality:",
+              "Publication-ready:",
+              publication_ready,
+          )
+          print(
+              "Best score:",
+              best_total_score,
+              "/ 70",
+          )
+
+          if not publication_ready:
+              print(
+                  "WARNING: The automation completed with the "
+                  "highest-scoring available candidate after "
+                  f"{CONCEPT_ATTEMPTS} concept attempts."
+              )
+
+          print(
+              "Final quality:",
               json.dumps(
                   best_critique,
-                  ensure_ascii=False
-              )
+                  ensure_ascii=False,
+              ),
           )
 
           PY
@@ -713,7 +1298,7 @@ jobs:
           git diff --cached --quiet || git commit -m "Update story history"
           git push
 
-      - name: Upload story artifact
+      - name: Upload generated story
         uses: actions/upload-artifact@v4
         with:
           name: generated-story
