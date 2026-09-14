@@ -12,15 +12,16 @@ jobs:
 
     steps:
       - name: Checkout repository
-        uses: actions/checkout@v4
+        uses: actions/checkout@v5
         with:
           fetch-depth: 0
 
-      - name: Generate adaptive-length story
+      - name: Generate story and visual plan
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           set -euo pipefail
+
           mkdir -p output .github/data
 
           python3 - <<'PY'
@@ -33,13 +34,24 @@ jobs:
           import urllib.request
 
           API_URL = "https://api.groq.com/openai/v1/chat/completions"
+
           HISTORY_FILE = ".github/data/story_history.json"
+
           MIN_WORDS = 105
           MAX_WORDS = 405
+
           WORDS_PER_MINUTE = 135
 
+          MIN_DURATION = 45
+          MAX_DURATION = 180
+
           api_key = os.environ["GROQ_API_KEY"]
+
           rng = random.SystemRandom()
+
+          # ============================================================
+          # CREATIVE VARIETY
+          # ============================================================
 
           story_modes = [
               "quiet human drama",
@@ -59,7 +71,9 @@ jobs:
               "a reunion after years apart",
               "a stranger helping at exactly the right moment",
               "a mistake leading to an unexpected opportunity",
-              "quiet honesty"
+              "quiet honesty",
+              "forgiveness after a misunderstanding",
+              "someone choosing kindness when it costs them"
           ]
 
           emotions = [
@@ -162,8 +176,12 @@ jobs:
               "setting": rng.choice(settings),
               "conflict": rng.choice(conflicts),
               "twist": rng.choice(twists),
-              "ending": rng.choice(endings),
+              "ending": rng.choice(endings)
           }
+
+          # ============================================================
+          # HISTORY
+          # ============================================================
 
           if os.path.exists(HISTORY_FILE):
               try:
@@ -175,30 +193,59 @@ jobs:
               history = []
 
           previous = "\n".join(
-              f"- {x.get('title','')} | {x.get('premise','')}"
-              for x in history[-30:]
+              f"- {item.get('title', '')} | "
+              f"{item.get('premise', '')}"
+              for item in history[-30:]
           ) or "NONE"
 
-          schema = {
+          # ============================================================
+          # STORY SCHEMA
+          # ============================================================
+
+          story_schema = {
               "type": "object",
               "properties": {
-                  "title": {"type": "string"},
-                  "hook": {"type": "string"},
-                  "setting": {"type": "string"},
-                  "conflict": {"type": "string"},
-                  "turning_point": {"type": "string"},
-                  "payoff": {"type": "string"},
-                  "description": {"type": "string"},
+                  "title": {
+                      "type": "string"
+                  },
+                  "hook": {
+                      "type": "string"
+                  },
+                  "setting": {
+                      "type": "string"
+                  },
+                  "conflict": {
+                      "type": "string"
+                  },
+                  "turning_point": {
+                      "type": "string"
+                  },
+                  "payoff": {
+                      "type": "string"
+                  },
+                  "description": {
+                      "type": "string"
+                  },
                   "characters": {
                       "type": "array",
                       "items": {
                           "type": "object",
                           "properties": {
-                              "name": {"type": "string"},
-                              "role": {"type": "string"},
-                              "visual_identity": {"type": "string"}
+                              "name": {
+                                  "type": "string"
+                              },
+                              "role": {
+                                  "type": "string"
+                              },
+                              "visual_identity": {
+                                  "type": "string"
+                              }
                           },
-                          "required": ["name", "role", "visual_identity"],
+                          "required": [
+                              "name",
+                              "role",
+                              "visual_identity"
+                          ],
                           "additionalProperties": False
                       }
                   },
@@ -207,20 +254,16 @@ jobs:
                       "items": {
                           "type": "object",
                           "properties": {
-                              "scene": {"type": "integer"},
-                              "narration": {"type": "string"},
-                              "visual_prompt": {"type": "string"},
-                              "camera": {"type": "string"},
-                              "on_screen_text": {"type": "string"},
-                              "sfx": {"type": "string"}
+                              "scene": {
+                                  "type": "integer"
+                              },
+                              "narration": {
+                                  "type": "string"
+                              }
                           },
                           "required": [
                               "scene",
-                              "narration",
-                              "visual_prompt",
-                              "camera",
-                              "on_screen_text",
-                              "sfx"
+                              "narration"
                           ],
                           "additionalProperties": False
                       }
@@ -240,131 +283,278 @@ jobs:
               "additionalProperties": False
           }
 
-          prompt = f"""
-          Create ONE completely original cinematic emotional/motivational story
-          for a vertical YouTube Short.
+          # ============================================================
+          # VISUAL SCHEMA
+          # ============================================================
 
-          This is a REAL MINI-STORY, not a motivational poem and not a list of advice.
-
-          Creative direction:
-          - story mode: {brief['mode']}
-          - primary emotion: {brief['emotion']}
-          - hook style: {brief['hook']}
-          - setting: {brief['setting']}
-          - conflict: {brief['conflict']}
-          - twist direction: {brief['twist']}
-          - ending style: {brief['ending']}
-
-          Previous channel stories:
-          {previous}
-
-          Make this clearly different from previous stories. Do not recycle a
-          premise, title pattern, central object, setting, emotional beat,
-          twist, or ending idea.
-
-          LENGTH:
-          Choose the natural length of the story yourself.
-          Valid range: 105-405 spoken words.
-          Do NOT pad the story to reach a target.
-          Do NOT cut an interesting story just to make it short.
-
-          Rough guide:
-          - 105-170 words: focused short story
-          - 171-250 words: deeper story
-          - 251-405 words: substantial story only when the plot genuinely deserves it
-
-          STORY:
-          - immediate hook
-          - specific protagonist and desire/problem
-          - concrete events and choices
-          - one clear conflict
-          - escalating tension
-          - meaningful turning point
-          - earned emotional payoff
-          - memorable final beat
-          - natural spoken English
-          - no filler
-
-          AVOID:
-          generic inspirational speeches, quote compilations, abstract
-          philosophy, celebrity content, copyrighted characters, copied
-          internet stories, "believe in yourself", "never give up",
-          "the human spirit", "everything happens for a reason",
-          "when one door closes", "follow your dreams", "little did they know",
-          "in the end, it was not about", "a testament to", and calls to action.
-
-          FACELESS VISUALS:
-          Use backs, silhouettes, hands, objects, reflections, shadows,
-          wide environments, close-ups, and over-the-shoulder framing.
-          Do not show identifiable faces. Keep characters, clothing, props,
-          locations and time of day consistent across scenes.
-
-          SCENES:
-          Create 7-18 scenes depending on story length.
-          Do not assign durations. Every scene must advance the plot.
-          Scene 1 contains the hook. The final scene contains the payoff.
-
-          Return only the requested JSON.
-          """
-
-          payload = {
-              "model": "openai/gpt-oss-20b",
-              "messages": [{"role": "user", "content": prompt}],
-              "reasoning_effort": "low",
-              "include_reasoning": False,
-              "temperature": 0.9,
-              "max_completion_tokens": 7000,
-              "response_format": {
-                  "type": "json_schema",
-                  "json_schema": {
-                      "name": "adaptive_short_story",
-                      "strict": True,
-                      "schema": schema
+          visual_schema = {
+              "type": "object",
+              "properties": {
+                  "scenes": {
+                      "type": "array",
+                      "items": {
+                          "type": "object",
+                          "properties": {
+                              "scene": {
+                                  "type": "integer"
+                              },
+                              "visual_prompt": {
+                                  "type": "string"
+                              },
+                              "camera": {
+                                  "type": "string"
+                              },
+                              "on_screen_text": {
+                                  "type": "string"
+                              },
+                              "sfx": {
+                                  "type": "string"
+                              }
+                          },
+                          "required": [
+                              "scene",
+                              "visual_prompt",
+                              "camera",
+                              "on_screen_text",
+                              "sfx"
+                          ],
+                          "additionalProperties": False
+                      }
                   }
-              }
+              },
+              "required": [
+                  "scenes"
+              ],
+              "additionalProperties": False
           }
 
-          req = urllib.request.Request(
-              API_URL,
-              data=json.dumps(payload).encode("utf-8"),
-              headers={
-                  "Authorization": f"Bearer {api_key}",
-                  "Content-Type": "application/json",
-                  "User-Agent": "Aladdin-YT-Auto/1.0"
-              },
-              method="POST"
+          # ============================================================
+          # GROQ REQUEST FUNCTION
+          # ============================================================
+
+          def call_groq(prompt, schema, temperature, max_tokens):
+
+              payload = {
+                  "model": "openai/gpt-oss-20b",
+
+                  "messages": [
+                      {
+                          "role": "user",
+                          "content": prompt
+                      }
+                  ],
+
+                  "reasoning_effort": "low",
+
+                  "reasoning_format": "hidden",
+
+                  "temperature": temperature,
+
+                  "max_completion_tokens": max_tokens,
+
+                  "response_format": {
+                      "type": "json_schema",
+                      "json_schema": {
+                          "name": "structured_output",
+                          "strict": True,
+                          "schema": schema
+                      }
+                  }
+              }
+
+              request = urllib.request.Request(
+                  API_URL,
+                  data=json.dumps(payload).encode("utf-8"),
+                  headers={
+                      "Authorization": f"Bearer {api_key}",
+                      "Content-Type": "application/json",
+                      "User-Agent": "Aladdin-YT-Auto/1.0"
+                  },
+                  method="POST"
+              )
+
+              try:
+                  with urllib.request.urlopen(
+                      request,
+                      timeout=180
+                  ) as response:
+
+                      body = response.read().decode("utf-8")
+
+                      result = json.loads(body)
+
+              except urllib.error.HTTPError as e:
+
+                  print(f"HTTP ERROR: {e.code}")
+
+                  print(
+                      e.read().decode(
+                          "utf-8",
+                          errors="replace"
+                      )
+                  )
+
+                  raise
+
+              content = (
+                  result["choices"][0]["message"]
+                  .get("content", "")
+              )
+
+              if not content:
+                  raise RuntimeError(
+                      "Groq returned empty content."
+                  )
+
+              return json.loads(content)
+
+          # ============================================================
+          # STORY PROMPT
+          # ============================================================
+
+          story_prompt = f"""
+          Create ONE completely original cinematic emotional story for a
+          vertical YouTube Short.
+
+          This is a REAL MINI-STORY, NOT a motivational poem.
+
+          Creative direction for this episode:
+
+          Story mode:
+          {brief['mode']}
+
+          Primary emotion:
+          {brief['emotion']}
+
+          Hook style:
+          {brief['hook']}
+
+          Setting:
+          {brief['setting']}
+
+          Conflict:
+          {brief['conflict']}
+
+          Twist direction:
+          {brief['twist']}
+
+          Ending style:
+          {brief['ending']}
+
+          Previously produced stories:
+          {previous}
+
+          Do NOT repeat a previous premise, title pattern, setting,
+          central object, emotional beat, twist, or ending idea.
+
+          STORY RULES:
+
+          - Choose the natural story length.
+          - Spoken narration must be between 105 and 405 words.
+          - Do not pad the story.
+          - Do not cut a good story just to make it short.
+          - 105-170 words should usually be a focused story.
+          - 171-250 words should be used for a deeper story.
+          - 251-405 words should be used only when the story genuinely
+            deserves more development.
+
+          Every story should contain:
+
+          1. Immediate hook.
+          2. Specific protagonist.
+          3. Concrete desire/problem.
+          4. Clear conflict.
+          5. Escalation.
+          6. Meaningful choice or turning point.
+          7. Earned emotional payoff.
+          8. Memorable final beat.
+
+          Write natural spoken English.
+
+          Avoid:
+
+          - generic inspirational speeches
+          - abstract philosophy
+          - quote compilations
+          - celebrity content
+          - existing fictional characters
+          - copied internet stories
+          - movie plots
+          - song lyrics
+          - "believe in yourself"
+          - "never give up"
+          - "the human spirit"
+          - "everything happens for a reason"
+          - "when one door closes"
+          - "follow your dreams"
+          - "little did they know"
+          - "a testament to"
+          - generic calls to action
+
+          FACELESS CHANNEL:
+
+          The story may contain people, but the final visuals must NOT
+          require identifiable faces.
+
+          Characters should have consistent clothing, build, age range,
+          props and environments throughout the story.
+
+          Create 7-18 scenes depending on story length.
+
+          IMPORTANT:
+
+          For this first stage, each scene must contain ONLY:
+          - scene number
+          - narration
+
+          Do not provide camera directions or visual prompts yet.
+
+          Return ONLY the requested JSON.
+          """
+
+          story = call_groq(
+              story_prompt,
+              story_schema,
+              temperature=0.9,
+              max_tokens=6500
           )
 
-          try:
-              with urllib.request.urlopen(req, timeout=180) as response:
-                  result = json.loads(response.read().decode("utf-8"))
-          except urllib.error.HTTPError as e:
-              print(f"HTTP ERROR: {e.code}")
-              print(e.read().decode("utf-8", errors="replace"))
-              raise
-
-          content = result["choices"][0]["message"].get("content", "")
-          if not content:
-              raise RuntimeError("Groq returned empty content.")
-
-          data = json.loads(content)
-          scenes = data["scenes"]
+          scenes = story["scenes"]
 
           if not 7 <= len(scenes) <= 18:
-              raise RuntimeError(f"Expected 7-18 scenes, got {len(scenes)}.")
+              raise RuntimeError(
+                  f"Expected 7-18 scenes, got {len(scenes)}."
+              )
 
-          total_words = sum(
-              len(s["narration"].split())
-              for s in scenes
-          )
+          word_counts = [
+              len(scene["narration"].split())
+              for scene in scenes
+          ]
+
+          total_words = sum(word_counts)
 
           if not MIN_WORDS <= total_words <= MAX_WORDS:
               raise RuntimeError(
-                  f"Story has {total_words} words; allowed range is "
-                  f"{MIN_WORDS}-{MAX_WORDS}."
+                  f"Story has {total_words} words. "
+                  f"Allowed range: {MIN_WORDS}-{MAX_WORDS}."
               )
 
-          banned = [
+          # ============================================================
+          # ANTI-CLICHE CHECK
+          # ============================================================
+
+          all_story_text = (
+              story["title"] + " " +
+              story["hook"] + " " +
+              story["turning_point"] + " " +
+              story["payoff"] + " " +
+              " ".join(
+                  scene["narration"]
+                  for scene in scenes
+              )
+          ).lower()
+
+          banned_phrases = [
               "believe in yourself",
               "never give up",
               "the human spirit",
@@ -376,94 +566,201 @@ jobs:
               "in the end, it was not about"
           ]
 
-          all_text = (
-              data["title"] + " " +
-              data["hook"] + " " +
-              data["turning_point"] + " " +
-              data["payoff"] + " " +
-              " ".join(s["narration"] for s in scenes)
-          ).lower()
+          for phrase in banned_phrases:
 
-          hits = [
-              phrase
-              for phrase in banned
-              if phrase in all_text
-          ]
+              if phrase in all_story_text:
 
-          if hits:
-              raise RuntimeError(
-                  "Overused phrase detected: " +
-                  ", ".join(hits)
-              )
+                  raise RuntimeError(
+                      "Overused phrase detected: " + phrase
+                  )
 
-          concrete_markers = [
-              "door", "key", "letter", "phone", "train", "bus", "shop",
-              "store", "school", "hospital", "wallet", "bag", "ticket",
-              "box", "photo", "receipt", "car", "bike", "bench", "window",
-              "coffee", "flower", "package", "umbrella", "coat", "clock",
-              "watch", "ring", "book", "note", "cash", "food", "room",
-              "street", "station", "restaurant", "library", "market",
-              "cafe", "garage", "post office"
-          ]
+          # ============================================================
+          # VISUAL PLAN
+          # ============================================================
 
-          concrete_hits = sum(
-              1
-              for marker in concrete_markers
-              if marker in all_text
+          visual_input = json.dumps(
+              {
+                  "title": story["title"],
+                  "setting": story["setting"],
+                  "characters": story["characters"],
+                  "scenes": scenes
+              },
+              ensure_ascii=False
           )
 
-          if concrete_hits < 3:
+          visual_prompt = f"""
+          Create the production-ready visual plan for this original
+          faceless YouTube Short.
+
+          STORY DATA:
+
+          {visual_input}
+
+          VISUAL REQUIREMENTS:
+
+          Every scene must visually match its narration.
+
+          Maintain continuity:
+
+          - same characters
+          - same clothing
+          - same important props
+          - same location
+          - correct time of day
+          - believable physical positions
+
+          FACeless STYLE:
+
+          Never require an identifiable face.
+
+          Prefer:
+
+          - backs
+          - silhouettes
+          - hands
+          - close-ups
+          - objects
+          - environmental wide shots
+          - reflections
+          - shadows
+          - over-the-shoulder shots
+          - partial-body framing
+
+          Each visual prompt must be detailed enough for a cinematic
+          AI image/video generator.
+
+          Include:
+
+          subject
+          environment
+          lighting
+          mood
+          important objects
+          clothing continuity
+          composition
+          realism
+
+          Camera instructions should specify things such as:
+
+          wide shot
+          close-up
+          macro
+          tracking shot
+          slow push-in
+          overhead
+          handheld
+          rack focus
+
+          On-screen text should be short and optional.
+
+          SFX should be realistic and subtle.
+
+          Use exactly the same scene numbers.
+
+          Return ONLY the requested JSON.
+          """
+
+          visuals = call_groq(
+              visual_prompt,
+              visual_schema,
+              temperature=0.65,
+              max_tokens=5000
+          )
+
+          visual_scenes = visuals["scenes"]
+
+          if len(visual_scenes) != len(scenes):
               raise RuntimeError(
-                  "Story is too abstract; it needs more concrete events or objects."
+                  "Visual scene count does not match story scene count."
               )
 
-          # Estimate natural runtime from narration.
-          duration = round(
+          visual_by_number = {
+              scene["scene"]: scene
+              for scene in visual_scenes
+          }
+
+          # ============================================================
+          # MERGE + VALIDATE
+          # ============================================================
+
+          for scene in scenes:
+
+              number = scene["scene"]
+
+              if number not in visual_by_number:
+                  raise RuntimeError(
+                      f"Missing visual plan for scene {number}."
+                  )
+
+              visual = visual_by_number[number]
+
+              scene.update({
+                  "visual_prompt": visual["visual_prompt"],
+                  "camera": visual["camera"],
+                  "on_screen_text": visual["on_screen_text"],
+                  "sfx": visual["sfx"]
+              })
+
+          # ============================================================
+          # ADAPTIVE VIDEO LENGTH
+          # ============================================================
+
+          estimated_duration = round(
               total_words / WORDS_PER_MINUTE * 60
           )
 
-          if not 45 <= duration <= 180:
-              raise RuntimeError(
-                  f"Estimated duration is {duration}s; expected 45-180s."
+          estimated_duration = max(
+              MIN_DURATION,
+              min(
+                  MAX_DURATION,
+                  estimated_duration
               )
+          )
 
-          # Allocate scene duration proportionally.
           minimum_scene_seconds = 3
-          base = len(scenes) * minimum_scene_seconds
 
-          if base > duration:
+          base_duration = (
+              len(scenes) *
+              minimum_scene_seconds
+          )
+
+          if base_duration > estimated_duration:
+
               raise RuntimeError(
-                  "Too many scenes for the estimated duration."
+                  "Too many scenes for estimated duration."
               )
 
-          extra_total = duration - base
+          extra_duration = (
+              estimated_duration -
+              base_duration
+          )
 
-          weights = [
-              len(s["narration"].split())
-              for s in scenes
-          ]
-
-          weight_sum = sum(weights)
-
-          raw = [
-              extra_total * weight / weight_sum
-              for weight in weights
+          raw_extra = [
+              extra_duration *
+              count /
+              total_words
+              for count in word_counts
           ]
 
           extras = [
               int(value)
-              for value in raw
+              for value in raw_extra
           ]
 
-          leftover = extra_total - sum(extras)
+          leftover = (
+              extra_duration -
+              sum(extras)
+          )
 
           order = sorted(
-              range(len(raw)),
-              key=lambda i: raw[i] - extras[i],
+              range(len(raw_extra)),
+              key=lambda i:
+                  raw_extra[i] - extras[i],
               reverse=True
           )
 
           for index in order[:leftover]:
+
               extras[index] += 1
 
           durations = [
@@ -472,24 +769,32 @@ jobs:
           ]
 
           for index, scene in enumerate(scenes):
+
               scene["scene"] = index + 1
+
               scene["duration_seconds"] = durations[index]
 
-          data["story"] = " ".join(
+          story["story"] = " ".join(
               scene["narration"].strip()
               for scene in scenes
           )
 
-          data["estimated_duration_seconds"] = duration
-          data["word_count"] = total_words
+          story["word_count"] = total_words
+
+          story["estimated_duration_seconds"] = estimated_duration
+
+          # ============================================================
+          # SAVE FINAL OUTPUT
+          # ============================================================
 
           with open(
               "output/story.json",
               "w",
               encoding="utf-8"
           ) as f:
+
               json.dump(
-                  data,
+                  story,
                   f,
                   ensure_ascii=False,
                   indent=2
@@ -500,27 +805,31 @@ jobs:
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(data["title"])
+
+              f.write(story["title"])
 
           with open(
               "output/script.txt",
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(data["story"])
+
+              f.write(story["story"])
 
           with open(
               "output/description.txt",
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(data["description"])
+
+              f.write(story["description"])
 
           with open(
               "output/scenes.json",
               "w",
               encoding="utf-8"
           ) as f:
+
               json.dump(
                   scenes,
                   f,
@@ -528,18 +837,30 @@ jobs:
                   indent=2
               )
 
+          # ============================================================
+          # UPDATE HISTORY
+          # ============================================================
+
           premise = (
-              data["setting"] + " | " +
-              data["conflict"] + " | " +
-              data["turning_point"]
+              story["setting"] +
+              " | " +
+              story["conflict"] +
+              " | " +
+              story["turning_point"]
           )
 
+          fingerprint = hashlib.sha256(
+              (
+                  story["title"] +
+                  "|" +
+                  premise
+              ).encode("utf-8")
+          ).hexdigest()[:16]
+
           history.append({
-              "title": data["title"],
+              "title": story["title"],
               "premise": premise,
-              "fingerprint": hashlib.sha256(
-                  (data["title"] + "|" + premise).encode()
-              ).hexdigest()[:16],
+              "fingerprint": fingerprint,
               "timestamp": int(time.time())
           })
 
@@ -548,6 +869,7 @@ jobs:
               "w",
               encoding="utf-8"
           ) as f:
+
               json.dump(
                   history[-50:],
                   f,
@@ -555,35 +877,40 @@ jobs:
                   indent=2
               )
 
-          print("===================================")
-          print("✅ STORY GENERATED")
-          print("===================================")
-          print("Title:", data["title"])
+          print("========================================")
+          print("✅ STORY PIPELINE SUCCESSFUL")
+          print("========================================")
+          print("Title:", story["title"])
           print("Scenes:", len(scenes))
           print("Words:", total_words)
-          print("Estimated duration:", duration, "seconds")
-          print("Durations:", durations)
-          print("Mode:", brief["mode"])
+          print(
+              "Estimated duration:",
+              estimated_duration,
+              "seconds"
+          )
+          print("Scene durations:", durations)
+          print("Story mode:", brief["mode"])
           print("Emotion:", brief["emotion"])
-          print("===================================")
+          print("========================================")
           PY
 
-      - name: Commit story history
+      - name: Save story history
         continue-on-error: true
         run: |
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
+
           git add .github/data/story_history.json
 
           if git diff --cached --quiet; then
-            echo "No history changes."
+            echo "No history update."
           else
             git commit -m "Update AI story history"
             git push
           fi
 
       - name: Upload story package
-        uses: actions/upload-artifact@v4
+        uses: actions/upload-artifact@v7
         with:
           name: ai-short-story
           path: output/
