@@ -1,45 +1,152 @@
-name: Groq AI Diagnostic
+name: Faceless YouTube Agent
 
 on:
   workflow_dispatch:
 
 jobs:
-  test-groq:
+  generate-content:
     runs-on: ubuntu-latest
 
     steps:
-      - name: Test Groq model access
+      - name: Generate YouTube package
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
-          set -u
+          set -euo pipefail
 
-          echo "Testing Groq model access..."
+          mkdir -p output
 
-          HTTP_CODE=$(curl -sS -o response.json -w "%{http_code}" \
-            https://api.groq.com/openai/v1/chat/completions \
-            -H "Content-Type: application/json" \
-            -H "Authorization: Bearer ${GROQ_API_KEY}" \
-            -d '{
+          python3 - <<'PY'
+          import json
+          import os
+          import urllib.request
+          import urllib.error
+
+          api_key = os.environ["GROQ_API_KEY"]
+
+          prompt = """
+          Create one original faceless YouTube video package about a surprising,
+          evergreen topic that has broad worldwide appeal.
+
+          Requirements:
+          - Strong curiosity hook.
+          - About 700-900 words of narration.
+          - Clear, natural voice-over language.
+          - No "hey guys" or filler.
+          - 8-12 visual scenes.
+          - Each scene must include narration and a visual description.
+          - Include a compelling YouTube title.
+          - Include a YouTube description.
+          - Return ONLY valid JSON.
+          - Do NOT use markdown fences.
+          - Do NOT put the JSON inside backticks.
+
+          Required JSON:
+          {
+            "topic": "string",
+            "title": "string",
+            "description": "string",
+            "script": "string",
+            "scenes": [
+              {
+                "scene": 1,
+                "narration": "string",
+                "visual": "string"
+              }
+            ]
+          }
+          """
+
+          payload = {
               "model": "openai/gpt-oss-20b",
               "messages": [
-                {
-                  "role": "user",
-                  "content": "Write exactly one short sentence saying hello."
-                }
+                  {
+                      "role": "system",
+                      "content": (
+                          "You are a professional YouTube writer. "
+                          "Return ONLY valid JSON. "
+                          "The JSON must be complete and syntactically valid."
+                      )
+                  },
+                  {
+                      "role": "user",
+                      "content": prompt
+                  }
               ],
-              "max_tokens": 100
-            }')
+              "max_tokens": 8000,
+              "temperature": 0.7
+          }
 
-          echo
-          echo "HTTP STATUS: ${HTTP_CODE}"
-          echo "RESPONSE:"
-          cat response.json
-          echo
+          request = urllib.request.Request(
+              "https://api.groq.com/openai/v1/chat/completions",
+              data=json.dumps(payload).encode(),
+              headers={
+                  "Content-Type": "application/json",
+                  "Authorization": f"Bearer {api_key}"
+              },
+              method="POST"
+          )
 
-          if [ "$HTTP_CODE" != "200" ]; then
-            echo "❌ Groq request failed."
-            exit 1
-          fi
+          try:
+              with urllib.request.urlopen(request, timeout=180) as response:
+                  result = json.loads(response.read().decode())
+          except urllib.error.HTTPError as e:
+              print("HTTP ERROR:", e.code)
+              print(e.read().decode())
+              raise
 
-          echo "✅ Groq request succeeded."
+          choice = result["choices"][0]
+          message = choice["message"]
+          content = message.get("content", "")
+
+          print("Finish reason:", choice.get("finish_reason"))
+          print("Generated characters:", len(content))
+
+          if not content:
+              print("Full message object:")
+              print(json.dumps(message, indent=2))
+              raise RuntimeError("Model returned no content.")
+
+          content = content.strip()
+
+          # Remove accidental markdown fences if any appear.
+          if content.startswith("```json"):
+              content = content[7:]
+          if content.endswith("```"):
+              content = content[:-3]
+          content = content.strip()
+
+          data = json.loads(content)
+
+          required = ["topic", "title", "description", "script", "scenes"]
+          missing = [x for x in required if x not in data]
+
+          if missing:
+              raise RuntimeError(f"Missing JSON fields: {missing}")
+
+          with open("output/content.json", "w", encoding="utf-8") as f:
+              json.dump(data, f, ensure_ascii=False, indent=2)
+
+          with open("output/title.txt", "w", encoding="utf-8") as f:
+              f.write(data["title"])
+
+          with open("output/script.txt", "w", encoding="utf-8") as f:
+              f.write(data["script"])
+
+          with open("output/description.txt", "w", encoding="utf-8") as f:
+              f.write(data["description"])
+
+          with open("output/scenes.json", "w", encoding="utf-8") as f:
+              json.dump(data["scenes"], f, ensure_ascii=False, indent=2)
+
+          print("✅ CONTENT GENERATED")
+          print("Topic:", data["topic"])
+          print("Title:", data["title"])
+          PY
+
+      - name: Upload generated content
+        uses: actions/upload-artifact@v4
+        with:
+          name: youtube-content
+          path: output/
+          retention-days: 7
