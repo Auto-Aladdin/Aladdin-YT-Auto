@@ -21,6 +21,7 @@ jobs:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
         run: |
           set -euo pipefail
+
           mkdir -p output .github/data
 
           python3 - <<'PY'
@@ -37,16 +38,19 @@ jobs:
 
           MIN_WORDS = 105
           MAX_WORDS = 405
-
           WORDS_PER_MINUTE = 135
-
           MIN_DURATION = 45
           MAX_DURATION = 180
 
-          api_key = os.environ["GROQ_API_KEY"]
+          API_KEY = os.environ["GROQ_API_KEY"]
+
           rng = random.SystemRandom()
 
-          story_modes = [
+          # ============================================================
+          # CREATIVE VARIETY
+          # ============================================================
+
+          STORY_MODES = [
               "quiet human drama",
               "unexpected kindness",
               "second chance",
@@ -69,7 +73,7 @@ jobs:
               "someone choosing kindness when it costs them"
           ]
 
-          emotions = [
+          EMOTIONS = [
               "warmth",
               "hope",
               "regret",
@@ -87,7 +91,7 @@ jobs:
               "compassion"
           ]
 
-          hooks = [
+          HOOKS = [
               "start at the most intriguing moment",
               "start with a specific time or place",
               "start with a surprising action",
@@ -98,7 +102,7 @@ jobs:
               "start with someone making a decision they may regret"
           ]
 
-          settings = [
+          SETTINGS = [
               "a nearly empty bus station before sunrise",
               "a small neighborhood repair shop",
               "a rainy apartment building hallway",
@@ -121,7 +125,7 @@ jobs:
               "a mechanic's garage at closing time"
           ]
 
-          conflicts = [
+          CONFLICTS = [
               "a missed opportunity",
               "a financial problem that must be hidden",
               "a lost item with emotional value",
@@ -138,7 +142,7 @@ jobs:
               "choosing between convenience and doing what is right"
           ]
 
-          twists = [
+          TWISTS = [
               "the person who seemed unimportant was the key to the solution",
               "the ignored object carried the real emotional meaning",
               "the protagonist misunderstood what the other person needed",
@@ -151,7 +155,7 @@ jobs:
               "the protagonist discovers the other person planned for them too"
           ]
 
-          endings = [
+          ENDINGS = [
               "a quiet emotional realization",
               "a visual callback to the opening moment",
               "a brief line that changes the meaning of the story",
@@ -163,14 +167,18 @@ jobs:
           ]
 
           brief = {
-              "mode": rng.choice(story_modes),
-              "emotion": rng.choice(emotions),
-              "hook": rng.choice(hooks),
-              "setting": rng.choice(settings),
-              "conflict": rng.choice(conflicts),
-              "twist": rng.choice(twists),
-              "ending": rng.choice(endings),
+              "mode": rng.choice(STORY_MODES),
+              "emotion": rng.choice(EMOTIONS),
+              "hook": rng.choice(HOOKS),
+              "setting": rng.choice(SETTINGS),
+              "conflict": rng.choice(CONFLICTS),
+              "twist": rng.choice(TWISTS),
+              "ending": rng.choice(ENDINGS),
           }
+
+          # ============================================================
+          # HISTORY
+          # ============================================================
 
           if os.path.exists(HISTORY_FILE):
               try:
@@ -182,28 +190,52 @@ jobs:
               history = []
 
           previous = "\n".join(
-              f"- {item.get('title','')} | {item.get('premise','')}"
+              f"- {item.get('title', '')} | {item.get('premise', '')}"
               for item in history[-40:]
           ) or "NONE"
+
+          # ============================================================
+          # STORY SCHEMA
+          # ============================================================
 
           story_schema = {
               "type": "object",
               "properties": {
-                  "title": {"type": "string"},
-                  "hook": {"type": "string"},
-                  "setting": {"type": "string"},
-                  "conflict": {"type": "string"},
-                  "turning_point": {"type": "string"},
-                  "payoff": {"type": "string"},
-                  "description": {"type": "string"},
+                  "title": {
+                      "type": "string"
+                  },
+                  "hook": {
+                      "type": "string"
+                  },
+                  "setting": {
+                      "type": "string"
+                  },
+                  "conflict": {
+                      "type": "string"
+                  },
+                  "turning_point": {
+                      "type": "string"
+                  },
+                  "payoff": {
+                      "type": "string"
+                  },
+                  "description": {
+                      "type": "string"
+                  },
                   "characters": {
                       "type": "array",
                       "items": {
                           "type": "object",
                           "properties": {
-                              "name": {"type": "string"},
-                              "role": {"type": "string"},
-                              "visual_identity": {"type": "string"}
+                              "name": {
+                                  "type": "string"
+                              },
+                              "role": {
+                                  "type": "string"
+                              },
+                              "visual_identity": {
+                                  "type": "string"
+                              }
                           },
                           "required": [
                               "name",
@@ -218,8 +250,12 @@ jobs:
                       "items": {
                           "type": "object",
                           "properties": {
-                              "scene": {"type": "integer"},
-                              "narration": {"type": "string"}
+                              "scene": {
+                                  "type": "integer"
+                              },
+                              "narration": {
+                                  "type": "string"
+                              }
                           },
                           "required": [
                               "scene",
@@ -243,22 +279,43 @@ jobs:
               "additionalProperties": False
           }
 
+          # ============================================================
+          # CRITIC SCHEMA
+          # ============================================================
+
           critic_schema = {
               "type": "object",
               "properties": {
-                  "pass": {"type": "boolean"},
-                  "hook_score": {"type": "integer"},
-                  "originality_score": {"type": "integer"},
-                  "believability_score": {"type": "integer"},
-                  "emotional_score": {"type": "integer"},
-                  "conflict_score": {"type": "integer"},
-                  "ending_score": {"type": "integer"},
-                  "visual_score": {"type": "integer"},
+                  "pass": {
+                      "type": "boolean"
+                  },
+                  "hook_score": {
+                      "type": "integer"
+                  },
+                  "originality_score": {
+                      "type": "integer"
+                  },
+                  "believability_score": {
+                      "type": "integer"
+                  },
+                  "emotional_score": {
+                      "type": "integer"
+                  },
+                  "conflict_score": {
+                      "type": "integer"
+                  },
+                  "ending_score": {
+                      "type": "integer"
+                  },
+                  "visual_score": {
+                      "type": "integer"
+                  },
                   "issues": {
                       "type": "array",
-                      "items": {"type": "string"}
-                  },
-                  "repair_instructions": {"type": "string"}
+                      "items": {
+                          "type": "string"
+                      }
+                  }
               },
               "required": [
                   "pass",
@@ -269,11 +326,14 @@ jobs:
                   "conflict_score",
                   "ending_score",
                   "visual_score",
-                  "issues",
-                  "repair_instructions"
+                  "issues"
               ],
               "additionalProperties": False
           }
+
+          # ============================================================
+          # VISUAL SCHEMA
+          # ============================================================
 
           visual_schema = {
               "type": "object",
@@ -283,11 +343,21 @@ jobs:
                       "items": {
                           "type": "object",
                           "properties": {
-                              "scene": {"type": "integer"},
-                              "visual_prompt": {"type": "string"},
-                              "camera": {"type": "string"},
-                              "on_screen_text": {"type": "string"},
-                              "sfx": {"type": "string"}
+                              "scene": {
+                                  "type": "integer"
+                              },
+                              "visual_prompt": {
+                                  "type": "string"
+                              },
+                              "camera": {
+                                  "type": "string"
+                              },
+                              "on_screen_text": {
+                                  "type": "string"
+                              },
+                              "sfx": {
+                                  "type": "string"
+                              }
                           },
                           "required": [
                               "scene",
@@ -305,6 +375,10 @@ jobs:
               ],
               "additionalProperties": False
           }
+
+          # ============================================================
+          # GROQ CALL
+          # ============================================================
 
           def call_groq(prompt, schema, temperature, max_tokens):
               payload = {
@@ -333,7 +407,7 @@ jobs:
                   API_URL,
                   data=json.dumps(payload).encode("utf-8"),
                   headers={
-                      "Authorization": f"Bearer {api_key}",
+                      "Authorization": f"Bearer {API_KEY}",
                       "Content-Type": "application/json",
                       "User-Agent": "Aladdin-YT-Auto/1.0"
                   },
@@ -359,10 +433,9 @@ jobs:
                   )
                   raise
 
-              content = result["choices"][0]["message"].get(
-                  "content",
-                  ""
-              )
+              message = result["choices"][0]["message"]
+
+              content = message.get("content", "")
 
               if not content:
                   raise RuntimeError(
@@ -371,8 +444,11 @@ jobs:
 
               return json.loads(content)
 
-          def local_story_checks(story):
+          # ============================================================
+          # LOCAL STORY CHECKS
+          # ============================================================
 
+          def local_story_checks(story):
               scenes = story["scenes"]
 
               if not 7 <= len(scenes) <= 18:
@@ -380,16 +456,16 @@ jobs:
                       f"Expected 7-18 scenes, got {len(scenes)}."
                   )
 
-              words = [
+              word_counts = [
                   len(scene["narration"].split())
                   for scene in scenes
               ]
 
-              total = sum(words)
+              total_words = sum(word_counts)
 
-              if not MIN_WORDS <= total <= MAX_WORDS:
+              if not MIN_WORDS <= total_words <= MAX_WORDS:
                   raise ValueError(
-                      f"Story has {total} words; "
+                      f"Story has {total_words} words; "
                       f"allowed {MIN_WORDS}-{MAX_WORDS}."
                   )
 
@@ -417,46 +493,47 @@ jobs:
                   "the power of hope"
               ]
 
-              hits = [
+              found = [
                   phrase
                   for phrase in banned
                   if phrase in text
               ]
 
-              if hits:
+              if found:
                   raise ValueError(
                       "Cliche phrase detected: " +
-                      ", ".join(hits)
+                      ", ".join(found)
                   )
 
+              # Basic guards against the specific implausible patterns
+              # we've already encountered.
               implausible = [
                   "trapped in a freezer",
                   "inside a freezer",
                   "stuck in a freezer",
-                  "trapped inside a freezer",
                   "locked inside a freezer"
               ]
 
-              hits = [
+              found = [
                   phrase
                   for phrase in implausible
                   if phrase in text
               ]
 
-              if hits:
+              if found:
                   raise ValueError(
                       "Implausible premise detected: " +
-                      ", ".join(hits)
+                      ", ".join(found)
                   )
 
-              return words, total
+              return word_counts, total_words
 
-          # ------------------------------------------------------------
+          # ============================================================
           # STORY GENERATION
-          # ------------------------------------------------------------
+          # ============================================================
 
           story_prompt = f"""
-          Write ONE completely original cinematic emotional story for a
+          Create ONE completely original cinematic emotional story for a
           vertical YouTube Short.
 
           This must feel like a real short film in miniature,
@@ -473,43 +550,53 @@ jobs:
           Hook style:
           {brief['hook']}
 
-          Setting seed:
+          Setting:
           {brief['setting']}
 
           Conflict seed:
           {brief['conflict']}
 
-          Twist seed:
+          Twist direction:
           {brief['twist']}
 
           Ending style:
           {brief['ending']}
 
           RECENT STORIES:
+
           {previous}
 
-          Do NOT repeat their premise, setting, central object,
-          title pattern, emotional beat, twist, or ending idea.
+          Do NOT repeat a recent story's:
+          - premise
+          - setting
+          - central object
+          - title pattern
+          - emotional beat
+          - twist
+          - ending idea
 
-          HARD RULES:
+          STORY REQUIREMENTS
 
           - 105-405 spoken words.
-          - Natural story duration about 45-180 seconds.
+          - Natural runtime roughly 45-180 seconds.
           - Do not pad a short story.
-          - Do not stretch a story that is already complete.
-          - Give the protagonist a concrete goal/problem.
+          - Do not stretch a complete story.
+          - Give the protagonist a concrete goal or problem.
           - Make something concrete happen.
           - Create a believable conflict.
-          - Give the protagonist a meaningful choice or consequence.
-          - Build a logical turning point.
+          - Give the protagonist a meaningful choice,
+            consequence, or sacrifice.
+          - Build logical escalation.
+          - Make the turning point earned.
           - Make the ending pay off the setup.
-          - Let the meaning emerge from the events.
-          - Prefer one strong plot over multiple weak subplots.
-          - Every scene must advance the story.
-          - Keep everything physically plausible.
+          - Let the meaning emerge naturally from the events.
+          - Prefer one strong plot.
+          - Every scene must advance the plot.
+          - Keep all events physically plausible.
           - No unexplained miracles.
           - No absurd coincidences.
-          - No dangerous stunts presented casually.
+          - No random charity/medical/helping reveal added only
+            to manufacture emotion.
           - No celebrities.
           - No existing fictional characters.
           - No movie plots.
@@ -517,29 +604,31 @@ jobs:
           - No copied internet stories.
           - No calls to action.
 
-          Avoid motivational cliches including:
-          "believe in yourself",
-          "never give up",
-          "the human spirit",
-          "everything happens for a reason",
-          "when one door closes",
-          "follow your dreams",
-          "little did they know",
-          "a testament to".
+          AVOID:
 
-          FACELESS DESIGN:
+          "believe in yourself"
+          "never give up"
+          "the human spirit"
+          "everything happens for a reason"
+          "when one door closes"
+          "follow your dreams"
+          "little did they know"
+          "a testament to"
 
-          The story must naturally work without showing identifiable faces.
-          Use meaningful actions, hands, objects, silhouettes, backs,
-          body language and environments.
+          FACELESS DESIGN
+
+          The final video must work without identifiable faces.
+
+          Use meaningful actions, hands, silhouettes, backs,
+          objects, body language, shadows, reflections and environments.
 
           Create 7-18 scenes.
 
-          For this stage each scene must contain ONLY:
+          Each scene must contain only:
           - scene number
           - narration
 
-          Return ONLY JSON matching the schema.
+          Return ONLY the story JSON.
           """
 
           story = call_groq(
@@ -549,16 +638,19 @@ jobs:
               6500
           )
 
-          # ------------------------------------------------------------
-          # CRITIC
-          # ------------------------------------------------------------
+          word_counts, total_words = local_story_checks(story)
+
+          # ============================================================
+          # FIRST CRITIC
+          # ============================================================
 
           critic_prompt = f"""
           You are a ruthless senior short-film editor.
 
-          Evaluate this proposed YouTube Short for actual viewer enjoyment.
+          Evaluate this proposed YouTube Short for real viewer enjoyment.
 
           STORY:
+
           {json.dumps(story, ensure_ascii=False)}
 
           Score every category from 0 to 10:
@@ -571,85 +663,92 @@ jobs:
           - ending
           - visual potential
 
-          PASS only when:
+          PASS only if ALL scores are at least 7.
 
-          - every score is 7 or higher
-          - the premise is physically plausible
-          - the conflict is genuinely meaningful
-          - the protagonist has a concrete goal/problem
-          - the turning point is earned
-          - the ending resolves the central story
-          - there are no disconnected reveals
-          - there is no fake moral pasted onto the ending
-          - the story does not read like generic AI motivation
-          - the story is understandable without outside context
+          Also fail it if there is:
+          - a serious plot hole
+          - an implausible premise
+          - an obvious/no-choice conflict
+          - a disconnected reveal
+          - a pasted-on moral
+          - generic AI motivational language
+          - weak cause-and-effect
+          - a weak or predictable hook
+          - a weak ending
+          - no meaningful protagonist choice
+          - major repetition with the supplied recent stories
 
-          Look aggressively for:
+          Be strict.
 
-          - plot holes
-          - impossible situations
-          - obvious/no-choice conflicts
-          - random charity/helping reveals
-          - disconnected morals
-          - generic wording
-          - weak hooks
-          - repetitive ideas
-          - weak titles
-          - endings that do not pay off the opening
-
-          Return only critic JSON.
+          Return ONLY critic JSON.
           """
 
           critique = call_groq(
               critic_prompt,
               critic_schema,
-              0.25,
+              0.2,
               2500
           )
 
-          # ------------------------------------------------------------
+          # ============================================================
           # AUTOMATIC REPAIR
-          # ------------------------------------------------------------
+          # ============================================================
 
           if not critique["pass"]:
+              print("========================================")
+              print("⚠️ STORY FAILED FIRST QUALITY REVIEW")
+              print("========================================")
+              print(
+                  "Issues:",
+                  json.dumps(
+                      critique["issues"],
+                      ensure_ascii=False
+                  )
+              )
 
               repair_prompt = f"""
               You are the final story editor.
 
-              Rewrite this story to fix EVERY issue in the critic report.
+              Rewrite the supplied story to fix EVERY issue listed
+              by the critic.
 
               ORIGINAL STORY:
+
               {json.dumps(story, ensure_ascii=False)}
 
-              CRITIC:
+              CRITIC REPORT:
+
               {json.dumps(critique, ensure_ascii=False)}
+
+              Every item in the critic's "issues" list is a mandatory
+              repair requirement.
 
               FINAL QUALITY BAR:
 
               - believable human situation
               - strong first line
               - specific protagonist
-              - concrete goal/problem
+              - concrete problem or goal
               - meaningful conflict
+              - real choice or consequence
               - logical escalation
-              - difficult or meaningful choice
               - earned turning point
               - satisfying payoff
               - ending connected to the opening
               - no fake moral
-              - no random reveals
+              - no disconnected reveal
               - no impossible premise
-              - no motivational cliches
+              - no generic motivational writing
               - no filler
               - no calls to action
               - naturally filmable without identifiable faces
               - 105-405 spoken words
               - 7-18 scenes
 
-              Keep the strongest parts if they work.
-              Replace weak parts instead of merely rewording them.
+              Do NOT merely rephrase weak passages.
+              Fix the underlying story.
 
-              Return ONLY the story JSON.
+              Return ONLY the corrected story JSON.
               """
 
               story = call_groq(
@@ -659,25 +758,44 @@ jobs:
                   6500
               )
 
-              words, total_words = local_story_checks(
+              word_counts, total_words = local_story_checks(
                   story
               )
 
-              final_critic_prompt = f"""
+              # ========================================================
+              # SECOND CRITIC
+              # ========================================================
+
+              second_critic_prompt = f"""
               Perform the FINAL publication-readiness review.
 
               STORY:
+
               {json.dumps(story, ensure_ascii=False)}
 
-              PASS only when every category is at least 7/10 and there is
-              no serious plot hole, implausibility, weak conflict,
-              disconnected ending, or generic motivational writing.
+              Be extremely strict.
 
-              Return only critic JSON.
+              PASS requires every score to be 7 or higher and no
+              serious issue.
+
+              Check especially:
+
+              1. Does the hook create curiosity immediately?
+              2. Is the protagonist's situation specific?
+              3. Is the conflict genuinely difficult?
+              4. Is the turning point caused by earlier events?
+              5. Does the ending resolve the central problem?
+              6. Does the emotional payoff feel earned?
+              7. Is the story believable?
+              8. Does it avoid generic AI motivation?
+              9. Could viewers visualize it without faces?
+              10. Is it materially different from common clichés?
+
+              Return ONLY critic JSON.
               """
 
               final_critique = call_groq(
-                  final_critic_prompt,
+                  second_critic_prompt,
                   critic_schema,
                   0.15,
                   2500
@@ -685,12 +803,10 @@ jobs:
 
               if not final_critique["pass"]:
                   raise RuntimeError(
-                      "Story failed final quality review: " +
+                      "Story failed FINAL quality review. "
+                      "Issues: " +
                       json.dumps(
-                          final_critique.get(
-                              "issues",
-                              []
-                          ),
+                          final_critique["issues"],
                           ensure_ascii=False
                       )
                   )
@@ -698,46 +814,51 @@ jobs:
               quality_report = final_critique
 
           else:
-
-              words, total_words = local_story_checks(
-                  story
-              )
-
               quality_report = critique
 
-          # ------------------------------------------------------------
-          # VISUAL PLANNING — ONLY AFTER STORY PASSES
-          # ------------------------------------------------------------
+          # ============================================================
+          # VISUAL PLAN
+          # ============================================================
+
+          visual_schema_input = {
+              "title": story["title"],
+              "setting": story["setting"],
+              "characters": story["characters"],
+              "scenes": story["scenes"]
+          }
 
           visual_prompt = f"""
-          Create a production-ready visual plan for this approved
+          Create the production-ready visual plan for this APPROVED
           original faceless YouTube Short.
 
           STORY:
-          {json.dumps(story, ensure_ascii=False)}
+
+          {json.dumps(
+              visual_schema_input,
+              ensure_ascii=False
+          )}
 
           Create exactly one visual plan for every scene.
 
-          IMPORTANT:
+          RULES:
 
-          - The visual must directly match the narration.
+          - Every visual must directly match the narration.
           - Never invent a new event.
           - Never contradict the story.
-          - Never require an identifiable face.
+          - Never require a visible identifiable face.
           - Prefer backs, silhouettes, hands, objects, reflections,
-            shadows, close-ups, over-the-shoulder shots and environments.
-          - Keep characters, clothing, props, locations and time of day
-            consistent.
-          - Prompts must be concrete and cinematic.
-          - Specify subject, action, setting, lighting, mood,
-            composition and continuity.
-          - Camera directions must be physically plausible.
+            shadows, close-ups, wide environmental shots and
+            over-the-shoulder framing.
+          - Maintain the same character clothing, props, location
+            and time of day.
+          - Make prompts cinematic and production-ready.
+          - Specify subject, action, environment, lighting,
+            mood and composition.
+          - Camera movement must be physically plausible.
           - SFX must match the action.
-          - On-screen text must be short and used sparingly.
+          - On-screen text should be short and used sparingly.
 
-          Use exactly the same scene numbers.
-
-          Return ONLY JSON matching the schema.
+          Return ONLY the visual-plan JSON.
           """
 
           visuals = call_groq(
@@ -748,19 +869,16 @@ jobs:
           )
 
           visual_by_number = {
-              scene["scene"]: scene
-              for scene in visuals["scenes"]
+              item["scene"]: item
+              for item in visuals["scenes"]
           }
 
-          if len(visual_by_number) != len(
-              story["scenes"]
-          ):
+          if len(visual_by_number) != len(story["scenes"]):
               raise RuntimeError(
-                  "Visual plan count does not match story count."
+                  "Visual scene count does not match story scene count."
               )
 
           for scene in story["scenes"]:
-
               number = scene["scene"]
 
               if number not in visual_by_number:
@@ -772,35 +890,33 @@ jobs:
                   visual_by_number[number]
               )
 
-          # ------------------------------------------------------------
+          # ============================================================
           # ADAPTIVE RUNTIME
-          # ------------------------------------------------------------
+          # ============================================================
 
-          duration = round(
+          estimated_duration = round(
               total_words /
               WORDS_PER_MINUTE *
               60
           )
 
-          duration = max(
+          estimated_duration = max(
               MIN_DURATION,
               min(
                   MAX_DURATION,
-                  duration
+                  estimated_duration
               )
           )
 
-          base_duration = (
-              len(story["scenes"]) * 3
-          )
+          base_duration = len(story["scenes"]) * 3
 
-          if base_duration > duration:
+          if base_duration > estimated_duration:
               raise RuntimeError(
                   "Too many scenes for estimated runtime."
               )
 
-          extra = (
-              duration -
+          extra_duration = (
+              estimated_duration -
               base_duration
           )
 
@@ -812,39 +928,40 @@ jobs:
           weight_sum = sum(weights)
 
           raw = [
-              extra * weight / weight_sum
+              extra_duration * weight / weight_sum
               for weight in weights
           ]
 
-          whole = [
+          extras = [
               int(value)
               for value in raw
           ]
 
-          leftover = extra - sum(whole)
+          leftover = (
+              extra_duration -
+              sum(extras)
+          )
 
           order = sorted(
               range(len(raw)),
               key=lambda i:
-                  raw[i] - whole[i],
+                  raw[i] - extras[i],
               reverse=True
           )
 
           for index in order[:leftover]:
-              whole[index] += 1
+              extras[index] += 1
 
           durations = [
               3 + value
-              for value in whole
+              for value in extras
           ]
 
           for index, scene in enumerate(
               story["scenes"]
           ):
               scene["scene"] = index + 1
-              scene["duration_seconds"] = (
-                  durations[index]
-              )
+              scene["duration_seconds"] = durations[index]
 
           story["story"] = " ".join(
               scene["narration"].strip()
@@ -852,20 +969,13 @@ jobs:
           )
 
           story["word_count"] = total_words
-
-          story["estimated_duration_seconds"] = (
-              duration
-          )
-
+          story["estimated_duration_seconds"] = estimated_duration
           story["quality_checked"] = True
+          story["quality_scores"] = quality_report
 
-          story["quality_scores"] = (
-              quality_report
-          )
-
-          # ------------------------------------------------------------
-          # SAVE OUTPUT
-          # ------------------------------------------------------------
+          # ============================================================
+          # SAVE FILES
+          # ============================================================
 
           with open(
               "output/story.json",
@@ -884,27 +994,21 @@ jobs:
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(
-                  story["title"]
-              )
+              f.write(story["title"])
 
           with open(
               "output/script.txt",
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(
-                  story["story"]
-              )
+              f.write(story["story"])
 
           with open(
               "output/description.txt",
               "w",
               encoding="utf-8"
           ) as f:
-              f.write(
-                  story["description"]
-              )
+              f.write(story["description"])
 
           with open(
               "output/scenes.json",
@@ -918,9 +1022,9 @@ jobs:
                   indent=2
               )
 
-          # ------------------------------------------------------------
-          # UPDATE HISTORY
-          # ------------------------------------------------------------
+          # ============================================================
+          # HISTORY
+          # ============================================================
 
           premise = (
               story["setting"] +
@@ -935,9 +1039,7 @@ jobs:
                   story["title"] +
                   "|" +
                   premise
-              ).encode(
-                  "utf-8"
-              )
+              ).encode("utf-8")
           ).hexdigest()[:16]
 
           history.append(
@@ -961,42 +1063,20 @@ jobs:
                   indent=2
               )
 
-          print(
-              "========================================"
-          )
-          print(
-              "✅ STORY PASSED FULL QUALITY PIPELINE"
-          )
-          print(
-              "========================================"
-          )
-          print(
-              "Title:",
-              story["title"]
-          )
-          print(
-              "Scenes:",
-              len(story["scenes"])
-          )
-          print(
-              "Words:",
-              total_words
-          )
+          print("========================================")
+          print("✅ STORY PASSED FULL QUALITY PIPELINE")
+          print("========================================")
+          print("Title:", story["title"])
+          print("Scenes:", len(story["scenes"]))
+          print("Words:", total_words)
           print(
               "Estimated duration:",
-              duration,
+              estimated_duration,
               "seconds"
           )
-          print(
-              "Durations:",
-              durations
-          )
-          print(
-              "Quality checked: YES"
-          )
-          print(
-              "========================================"
-          )
+          print("Durations:", durations)
+          print("Quality checked: YES")
+          print("========================================")
           PY
 
       - name: Save story history
@@ -1008,7 +1088,7 @@ jobs:
           git add .github/data/story_history.json
 
           if git diff --cached --quiet; then
-            echo "No history update."
+            echo "No history changes."
           else
             git commit -m "Update AI story history"
             git push
