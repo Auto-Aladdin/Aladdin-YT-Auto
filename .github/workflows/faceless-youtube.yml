@@ -573,9 +573,14 @@ jobs:
                   issue_text.append(local_issue)
 
               repair_directive = (
-                  "Repair the structure while preserving only genuinely strong elements."
+                  "Repair the structure while preserving only genuinely strong elements. "
+                  "Treat the critic's examples as diagnosis only, never as instructions for fantasy, "
+                  "puzzles, supernatural devices, or implausible mechanisms."
                   if local_issue is None
-                  else "The hard validator found a structural flaw. Replace the offending mechanism, not just its wording."
+                  else "The hard validator found a structural flaw. Replace the offending mechanism completely. "
+                       "Hard realism rules override every critic suggestion; do not implement speculative "
+                       "examples such as time-locks, hidden codes, magical behavior, impossible exits, "
+                       "or artificial professional penalties."
               )
 
               return f"""
@@ -653,12 +658,17 @@ jobs:
           print(json.dumps(critique, ensure_ascii=False, indent=2))
 
           # ============================================================
-          # CALLS 3-6: UP TO TWO STRUCTURAL REPAIR ROUNDS
+          # CALLS 3+: BOUNDED STRUCTURAL REPAIR
           # ============================================================
 
+          # The first critic is used as the repair diagnosis. We do not spend
+          # another API call critiquing every intermediate repair. This keeps
+          # the pipeline stable under Groq rate limits while preserving a
+          # mandatory independent final publication critic below.
           quality_report = critique
+          repair_rounds_used = 0
 
-          for repair_round in range(1, MAX_REPAIR_ROUNDS + 1):
+          while repair_rounds_used < MAX_REPAIR_ROUNDS:
               local_issue = local_story_check(story)
 
               if not local_issue and quality_report.get("pass"):
@@ -667,8 +677,13 @@ jobs:
               if api_calls >= MAX_API_CALLS:
                   break
 
+              repair_rounds_used += 1
+
               print("=" * 60)
-              print(f"STRUCTURAL REPAIR ROUND {repair_round}/{MAX_REPAIR_ROUNDS}")
+              print(
+                  f"STRUCTURAL REPAIR ROUND "
+                  f"{repair_rounds_used}/{MAX_REPAIR_ROUNDS}"
+              )
               print("=" * 60)
 
               story = call_groq(
@@ -678,7 +693,9 @@ jobs:
                       local_issue,
                   ),
                   STORY_SCHEMA,
-                  temperature=0.50 if repair_round == 1 else 0.42,
+                  temperature=(
+                      0.50 if repair_rounds_used == 1 else 0.42
+                  ),
                   max_tokens=4500,
               )
 
@@ -686,24 +703,122 @@ jobs:
 
               if local_issue:
                   print("REPAIR LOCAL CHECK:", local_issue)
-                  quality_report = {
-                      "pass": False,
-                      "hook_score": 0,
-                      "originality_score": 0,
-                      "believability_score": 0,
-                      "emotional_score": 0,
-                      "conflict_score": 0,
-                      "ending_score": 0,
-                      "visual_score": 0,
-                      "issues": [local_issue],
-                  }
-                  continue
 
-              if api_calls >= MAX_API_CALLS:
-                  break
+                  # One emergency clean-repair is available only when there
+                  # is still room for the mandatory final critic call.
+                  if api_calls + 1 < MAX_API_CALLS:
+                      print(
+                          "RUNNING EMERGENCY CLEAN REPAIR AFTER LOCAL REJECTION"
+                      )
+
+                      story = call_groq(
+                          make_repair_prompt(
+                              story,
+                              {
+                                  "pass": False,
+                                  "issues": [
+                                      "HARD LOCAL REJECTION: " + local_issue,
+                                      "Do not repeat or disguise the rejected mechanism.",
+                                      "Use a completely ordinary real-world mechanism instead.",
+                                  ],
+                              },
+                              local_issue,
+                          ),
+                          STORY_SCHEMA,
+                          temperature=0.32,
+                          max_tokens=4500,
+                      )
+
+                      local_issue = local_story_check(story)
+
+                      if local_issue:
+                          print(
+                              "EMERGENCY REPAIR LOCAL CHECK:",
+                              local_issue,
+                          )
+                          quality_report = {
+                              "pass": False,
+                              "issues": [local_issue],
+                          }
+                          continue
+
+                      print("EMERGENCY REPAIR PASSED LOCAL CHECK")
+
+                  if local_issue:
+                      quality_report = {
+                          "pass": False,
+                          "issues": [local_issue],
+                      }
+                      continue
+
+              # The current story is locally safe. The original critic's
+              # issues remain the repair guidance until the independent final
+              # critic decides publication readiness.
+              print("REPAIR PASSED LOCAL CHECK")
+
+          # ============================================================
+          # FINAL INDEPENDENT PUBLICATION CRITIC
+          # ============================================================
+
+          if api_calls >= MAX_API_CALLS:
+              raise RuntimeError(
+                  "Groq API call budget was exhausted before the final "
+                  "independent publication review."
+              )
+
+          print("=" * 60)
+          print("FINAL INDEPENDENT PUBLICATION REVIEW")
+          print("=" * 60)
+
+          final_quality_report = call_groq(
+              make_critic_prompt(story),
+              CRITIC_SCHEMA,
+              temperature=0.10,
+              max_tokens=2200,
+          )
+
+          print(
+              json.dumps(
+                  final_quality_report,
+                  ensure_ascii=False,
+                  indent=2,
+              )
+          )
+
+          quality_report = final_quality_report
+
+          # One last complete repair is allowed only when the independent
+          # final critic rejects the story and there is enough API budget for
+          # both the repair and one replacement final critic.
+          if (
+              not quality_report.get("pass")
+              and api_calls + 1 < MAX_API_CALLS
+          ):
+              print("=" * 60)
+              print("FINAL CRITIC REJECTED STORY — RUNNING LAST REPAIR")
+              print("=" * 60)
+
+              story = call_groq(
+                  make_repair_prompt(
+                      story,
+                      quality_report,
+                      None,
+                  ),
+                  STORY_SCHEMA,
+                  temperature=0.38,
+                  max_tokens=4500,
+              )
+
+              final_local_issue = local_story_check(story)
+
+              if final_local_issue:
+                  raise RuntimeError(
+                      "Last repair failed hard local validation: "
+                      + final_local_issue
+                  )
 
               print("=" * 60)
-              print(f"QUALITY REVIEW AFTER REPAIR {repair_round}")
+              print("FINAL REVIEW AFTER LAST REPAIR")
               print("=" * 60)
 
               quality_report = call_groq(
@@ -721,12 +836,11 @@ jobs:
                   )
               )
 
-              if quality_report["pass"]:
-                  break
-
           # NEVER bypass an independent quality rejection with local validation.
-          # A story may be published only when the latest critic explicitly passes it.
+          # A story may be published only when the latest independent critic
+          # explicitly passes it.
           final_local_issue = local_story_check(story)
+
           if final_local_issue:
               raise RuntimeError(
                   "Story could not be made publication-safe: "
@@ -735,8 +849,9 @@ jobs:
 
           if not quality_report.get("pass"):
               raise RuntimeError(
-                  "Story failed the publication quality gate after all bounded repair attempts. "
-                  "An independent critic did not approve the final story. Issues: "
+                  "Story failed the publication quality gate. "
+                  "The independent final critic did not approve the final story. "
+                  "Issues: "
                   + json.dumps(
                       quality_report.get("issues", []),
                       ensure_ascii=False,
