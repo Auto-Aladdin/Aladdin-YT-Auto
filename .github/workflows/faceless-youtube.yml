@@ -284,9 +284,26 @@ jobs:
                           body = json.loads(response.read().decode("utf-8"))
 
                       elapsed = time.monotonic() - call_started
-                      print(f"[Groq] success label={label} elapsed={elapsed:.2f}s", flush=True)
+                      choice = body["choices"][0]
+                      finish_reason = choice.get("finish_reason")
+                      print(
+                          f"[Groq] success label={label} elapsed={elapsed:.2f}s finish_reason={finish_reason}",
+                          flush=True,
+                      )
 
-                      content = body["choices"][0]["message"].get("content", "")
+                      if finish_reason == "length":
+                          if attempt < MAX_API_RETRIES:
+                              print(
+                                  f"[Groq] output truncated for {label}; retrying once with the same deterministic request.",
+                                  flush=True,
+                              )
+                              time.sleep(0.5)
+                              continue
+                          raise RuntimeError(
+                              f"Groq output truncated before completing JSON for {label}."
+                          )
+
+                      content = choice["message"].get("content", "")
                       if not content:
                           raise RuntimeError("Groq returned empty content.")
 
@@ -359,7 +376,7 @@ jobs:
                       "premises": {
                           "type": "array",
                           "minItems": 1,
-                          "maxItems": 3,
+                          "maxItems": 5,
                           "items": {
                               "type": "object",
                               "properties": {
@@ -374,10 +391,12 @@ jobs:
                                   "consequence": {"type": "string"},
                                   "visual": {"type": "string"},
                                   "why_fresh": {"type": "string"},
+                                  "freshness_score": {"type": "integer", "minimum": 0, "maximum": 10},
                               },
                               "required": [
                                   "title", "protagonist", "age", "role", "goal", "relationship",
-                                  "conflict", "choice", "consequence", "visual", "why_fresh"
+                                  "conflict", "choice", "consequence", "visual", "why_fresh",
+                                  "freshness_score"
                               ],
                               "additionalProperties": False,
                           },
@@ -655,8 +674,10 @@ jobs:
           - consequence: concrete lasting result after the choice
           - visual: one plot-essential visual motif
           - why_fresh: one sentence explaining why the premise is not a common AI short
+          - freshness_score: integer 0-10 rating how distinctive and non-generic the premise is
 
           Keep EACH premise compact. Do not repeat the same family of plot three times.
+          Give each premise a realistic freshness_score; do not give every option 10.
           At least two premises must be relationship-driven, not machine/deadline driven.
           No child danger, illness, hospitals, magic, miracles, benefactors, hidden fortunes, romance as the main engine,
           honesty-vs-lying, parent-vs-work, money-returning, elevator, blackout, concert, audition, train platform,
@@ -689,10 +710,13 @@ jobs:
           Each scene must contain an integer scene field plus narration.
 
           Story rules:
-          - 9-11 scenes.
-          - 170-220 narration words preferred; absolute 150-260.
-          - Every scene 12-26 spoken words.
+          - 9-11 scenes; target EXACTLY 10 scenes unless the story truly requires 9 or 11.
+          - Target 180-210 total narration words; absolute 150-260.
+          - Target 16-22 spoken words in EACH scene; absolute 12-26.
+          - Before returning, internally count the narration words across all scenes.
+          - Before returning, internally verify there are 9-11 scenes and every scene is 12-26 words.
           - Specific adult protagonist and adult relationship.
+          - Protagonist role must be a concrete adult occupation or responsibility of at least TWO words (for example: school administrator, property manager, print shop owner).
           - Concrete goal today.
           - Real external conflict with two plausible options.
           - Persistent cost after the decision.
@@ -716,7 +740,18 @@ jobs:
           Return ONLY ONE TOP-LEVEL JSON OBJECT containing the same story fields. NEVER return an array.
           Change only what is necessary to fix the validation problem.
           Do not replace the premise, relationship, setting, or central mechanism.
-          Do not introduce any banned plot pattern. Keep 9-11 scenes and 150-260 words.
+          Do not introduce any banned plot pattern.
+
+          REPAIR MUST STILL PASS ALL GLOBAL STORY GATES BEFORE RETURNING:
+          - 9-11 scenes; target exactly 10.
+          - 180-210 total narration words preferred; absolute 150-260.
+          - Every scene must contain 12-26 spoken words; target 16-22.
+          - Protagonist role must be a concrete adult occupation/responsibility of at least two words.
+          - Keep every required top-level field.
+          - Keep all character fields.
+          - Keep a concrete consequence, persistent cost, earned turning point, and imperfect payoff.
+          - Do not introduce any banned story pattern or cliché.
+          - Internally count every scene and narration word total before returning.
 
           STORY:
           {json.dumps(story, ensure_ascii=False)}
@@ -759,6 +794,18 @@ jobs:
                   if not isinstance(premises, list):
                       raise RuntimeError("Premise response did not contain a premises array.")
 
+                  # The prompt asks for three. Some compliant model outputs may still
+                  # over-generate; accept up to five at the API boundary, then only
+                  # consider the first three so one harmless extra option cannot cause
+                  # an HTTP 400 or change the three-option story concept.
+                  if len(premises) > 3:
+                      print(
+                          f"PREMISE GENERATOR RETURNED {len(premises)} OPTIONS; "
+                          "considering the first 3 only.",
+                          flush=True,
+                      )
+                      premises = premises[:3]
+
                   valid = []
                   for i, p in enumerate(premises):
                       issue = premise_issue(p)
@@ -770,13 +817,25 @@ jobs:
                   if not valid:
                       raise RuntimeError("No valid premise was returned by the premise generator.")
 
+                  valid.sort(
+                      key=lambda x: (
+                          int(x.get("freshness_score", 0))
+                          if isinstance(x.get("freshness_score", 0), int) and not isinstance(x.get("freshness_score", 0), bool)
+                          else 0
+                      ),
+                      reverse=True,
+                  )
                   selected = valid[0]
-                  print(f"SELECTED PREMISE: {selected.get('title', '(untitled)')}", flush=True)
+                  print(
+                      f"SELECTED PREMISE: {selected.get('title', '(untitled)')} "
+                      f"(freshness={selected.get('freshness_score', 0)})",
+                      flush=True,
+                  )
 
                   candidate = call_groq(
                       story_prompt(selected),
                       temperature=0.64,
-                      max_tokens=1800,
+                      max_tokens=1600,
                       label=f"story-{attempt}",
                   )
                   candidate = normalize_story_response(candidate)
@@ -792,11 +851,13 @@ jobs:
                           or issue.startswith("Hook is too short")
                           or issue.startswith("Missing story field:")
                           or issue.startswith("Every scene must")
+                          or issue.startswith("Story must contain")
+                          or issue.startswith("Protagonist role")
                       ):
                           repaired = call_groq(
                               repair_prompt(candidate, issue),
                               temperature=0.32,
-                              max_tokens=1800,
+                              max_tokens=1700,
                               label=f"local-repair-{attempt}",
                           )
                           repaired = normalize_story_response(repaired)
@@ -844,7 +905,11 @@ jobs:
           Keep the same named protagonist only if useful; otherwise replace the premise entirely.
           The replacement must have an adult relationship, concrete present-day goal, two legitimate options,
           persistent cost, earned turning point, imperfect payoff, and a distinctive plot-essential visual detail.
+          It must contain 9-11 scenes, preferably exactly 10, with 16-22 narration words per scene,
+          and 180-210 total narration words while staying within the absolute 150-260 range.
+          The protagonist role must be a concrete adult occupation/responsibility of at least two words.
           No banned pattern from the story rules.
+          Internally verify all deterministic gates before returning.
           Return ONLY ONE TOP-LEVEL JSON OBJECT with all required story fields. NEVER return an array.
 
           CRITIC:
@@ -854,7 +919,7 @@ jobs:
           {json.dumps(candidate, ensure_ascii=False)}
                           """,
                           temperature=0.55,
-                          max_tokens=1800,
+                          max_tokens=1700,
                           label=f"structural-repair-{attempt}",
                       )
                       repair = normalize_story_response(repair)
