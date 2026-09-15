@@ -25,7 +25,6 @@ jobs:
           import json
           import os
           import random
-          import re
           import time
           import urllib.error
           import urllib.request
@@ -38,21 +37,18 @@ jobs:
 
           MIN_WORDS = 105
           MAX_WORDS = 405
+          TARGET_MIN_WORDS = 140
+          TARGET_MAX_WORDS = 300
           WPM = 135
           MIN_DURATION = 45
           MAX_DURATION = 180
 
-          # Bounded budget for the documented 8K TPM ceiling.
-          # Worst case: 3 generation calls + 1 repair + 3 critic calls = 7.
-          MAX_API_CALLS = 7
+          # Keep the run deliberately small for the documented 8K TPM ceiling.
+          # Maximum normal path: 6 calls across 3 independent story candidates.
+          # Each candidate is generation + critic. No repair loop.
+          MAX_API_CALLS = 6
           MAX_STORY_ATTEMPTS = 3
           MIN_SECONDS_BETWEEN_CALLS = 20.0
-
-          # Critic acceptance: an average of >= 6.8 with no single axis
-          # below 6 is reachable for a good 200-word micro-story. Requiring
-          # 7/10 on every axis rejected almost everything in practice.
-          CRITIC_MIN_AVG = 6.8
-          CRITIC_MIN_AXIS = 6
 
           API_KEY = os.environ["GROQ_API_KEY"]
           rng = random.SystemRandom()
@@ -73,9 +69,18 @@ jobs:
           ]
 
           EMOTIONS = [
-              "warmth", "relief", "regret", "gratitude", "wonder", "belonging",
-              "bittersweet acceptance", "quiet joy", "determination", "compassion",
-              "forgiveness", "surprise",
+              "warmth",
+              "relief",
+              "regret",
+              "gratitude",
+              "wonder",
+              "belonging",
+              "bittersweet acceptance",
+              "quiet joy",
+              "determination",
+              "compassion",
+              "forgiveness",
+              "surprise",
           ]
 
           SETTINGS = [
@@ -112,10 +117,16 @@ jobs:
           ]
 
           BANNED_CLICHES = [
-              "believe in yourself", "never give up", "the human spirit",
-              "everything happens for a reason", "when one door closes",
-              "follow your dreams", "little did they know", "the power of hope",
-              "sometimes life", "in the end, it was not about",
+              "believe in yourself",
+              "never give up",
+              "the human spirit",
+              "everything happens for a reason",
+              "when one door closes",
+              "follow your dreams",
+              "little did they know",
+              "the power of hope",
+              "sometimes life",
+              "in the end, it was not about",
           ]
 
           BANNED_PATTERNS = [
@@ -174,9 +185,21 @@ jobs:
                   },
               },
               "required": [
-                  "title", "hook", "setting", "protagonist", "desire", "stakes",
-                  "obstacle", "choice", "cost", "consequence", "turning_point",
-                  "payoff", "description", "characters", "scenes",
+                  "title",
+                  "hook",
+                  "setting",
+                  "protagonist",
+                  "desire",
+                  "stakes",
+                  "obstacle",
+                  "choice",
+                  "cost",
+                  "consequence",
+                  "turning_point",
+                  "payoff",
+                  "description",
+                  "characters",
+                  "scenes",
               ],
               "additionalProperties": False,
           }
@@ -192,12 +215,21 @@ jobs:
                   "conflict_score": {"type": "integer"},
                   "ending_score": {"type": "integer"},
                   "visual_score": {"type": "integer"},
-                  "issues": {"type": "array", "items": {"type": "string"}},
+                  "issues": {
+                      "type": "array",
+                      "items": {"type": "string"},
+                  },
               },
               "required": [
-                  "pass", "hook_score", "originality_score", "believability_score",
-                  "emotional_score", "conflict_score", "ending_score",
-                  "visual_score", "issues",
+                  "pass",
+                  "hook_score",
+                  "originality_score",
+                  "believability_score",
+                  "emotional_score",
+                  "conflict_score",
+                  "ending_score",
+                  "visual_score",
+                  "issues",
               ],
               "additionalProperties": False,
           }
@@ -210,6 +242,9 @@ jobs:
                   return []
 
           history = load_history()
+
+          # Keep history compact. Only high-level premise information is useful
+          # for novelty checking; do not resend entire old stories to Groq.
           recent = history[-12:]
           recent_text = "\n".join(
               f"- {str(item.get('title', ''))[:100]} | "
@@ -234,6 +269,7 @@ jobs:
                   pass
               total = 0.0
               matched = False
+              import re
               minute = re.search(r"(\d+(?:\.\d+)?)m", text)
               second = re.search(r"(\d+(?:\.\d+)?)s", text)
               if minute:
@@ -293,6 +329,7 @@ jobs:
               }
 
               attempts = 0
+
               while True:
                   attempts += 1
                   request = urllib.request.Request(
@@ -301,7 +338,7 @@ jobs:
                       headers={
                           "Authorization": f"Bearer {API_KEY}",
                           "Content-Type": "application/json",
-                          "User-Agent": "Aladdin-YT-Auto/3.1",
+                          "User-Agent": "Aladdin-YT-Auto/3.0",
                       },
                       method="POST",
                   )
@@ -323,12 +360,17 @@ jobs:
                                   "Groq rate limit remained active after one "
                                   "header-guided retry. Response: " + raw
                               )
+
                           retry_after = _header_float(exc.headers, "retry-after", 10.0)
                           reset_tokens = _header_float(
-                              exc.headers, "x-ratelimit-reset-tokens", 10.0
+                              exc.headers,
+                              "x-ratelimit-reset-tokens",
+                              10.0,
                           )
+
                           wait_seconds = max(5.0, retry_after, reset_tokens) + 1.0
                           wait_seconds = min(wait_seconds, 75.0)
+
                           print(
                               f"Groq HTTP 429. Waiting {wait_seconds:.1f}s "
                               f"using Groq rate-limit headers..."
@@ -341,10 +383,15 @@ jobs:
                           time.sleep(5)
                           continue
 
-                      raise RuntimeError(f"Groq HTTP {exc.code}: {raw}")
+                      raise RuntimeError(
+                          f"Groq HTTP {exc.code}: {raw}"
+                      )
 
           def word_count(story):
-              return sum(len(scene["narration"].split()) for scene in story["scenes"])
+              return sum(
+                  len(scene["narration"].split())
+                  for scene in story["scenes"]
+              )
 
           def local_story_check(story):
               scenes = story.get("scenes", [])
@@ -357,8 +404,10 @@ jobs:
                   return "Scene numbers must be consecutive starting at 1."
 
               words = word_count(story)
+              if words < MIN_WORDS:
+                  return f"Story is too short at {words} words; minimum is {MIN_WORDS}."
               if words > MAX_WORDS:
-                  return f"Story is too long at {words} words."
+                  return f"Story is too long at {words} words; maximum is {MAX_WORDS}."
 
               text = json.dumps(story, ensure_ascii=False).lower()
 
@@ -381,6 +430,7 @@ jobs:
                   ("turning_point", 6),
                   ("payoff", 6),
               ]
+
               for field, minimum_words in required_quality:
                   if len(str(story.get(field, "")).split()) < minimum_words:
                       return f"{field} is too vague."
@@ -398,14 +448,10 @@ jobs:
                   if phrase in text:
                       return f"Generic emotional resolution detected: {phrase}"
 
-              if "license" in text and any(
-                  term in text for term in ("review", "regulatory", "investigation", "revoke", "renewal")
-              ):
+              if "license" in text and any(term in text for term in ("review", "regulatory", "investigation", "revoke", "renewal")):
                   return "Artificial professional-stakes mechanism detected."
 
-              if any(
-                  term in text for term in ("blooms when", "only blooms when", "magical", "supernatural", "mysteriously", "miraculously")
-              ):
+              if any(term in text for term in ("blooms when", "only blooms when", "magical", "supernatural", "mysteriously", "miraculously")):
                   return "Supernatural or magical story mechanism detected; keep the story realistic."
 
               if "cut corners" in text and "do the right thing" in text:
@@ -444,9 +490,7 @@ jobs:
           3. The obstacle is external and specific. It must force a real choice.
 
           4. The choice must have an actual cost. Both options must be understandable
-             to a reasonable person; avoid simple good-vs-bad moral tests. Prefer
-             conflicts where the "right" path is genuinely unclear or where the
-             protagonist must choose between two legitimate obligations.
+             to a reasonable person; avoid simple good-vs-bad moral tests.
 
           4A. Stay completely realistic. No magic, supernatural effects, prophetic
               objects, impossible coincidences, unexplained transformations, or
@@ -460,8 +504,7 @@ jobs:
              promise, mistake, skill, or piece of information.
 
           7. The ending must solve or transform the central problem and pay off
-             something introduced near the beginning. Avoid the "honesty is
-             instantly rewarded" pattern.
+             something introduced near the beginning.
 
           8. The story should contain one distinctive visual motif tied directly
              to the conflict, not generic rain, handwriting, ink, clocks, kites,
@@ -528,11 +571,10 @@ jobs:
           - Use a believable ordinary human situation with a specific protagonist.
           - Give the protagonist a concrete goal that matters today.
           - Use a real external obstacle and a meaningful choice with a real cost.
-            Prefer conflicts where both options are legitimate obligations.
           - The turning point must come from something established earlier.
           - The ending must resolve the central problem without a miracle, secret
             benefactor, magical object, hidden fortune, random coincidence, or sudden
-            forgiveness. Avoid "honesty is instantly rewarded" endings.
+            forgiveness.
           - Do not use race-against-the-clock mail delivery, jammed doors/slots,
             keys unlocking hidden things, school deadlines, florist/orchid symbolism,
             love letters, recipes, photographs, kites, violinists, child rescue,
@@ -553,31 +595,66 @@ jobs:
           Return ONLY the new story JSON.
           """
 
-          def make_repair_prompt(story, issue):
-              return f"""
-          The following story JSON failed a hard local validation check. Repair
-          ONLY the specific problem described, keeping everything else identical
-          (same premise, characters, setting, scenes, structure).
+          CRITIC_SCORE_KEYS = [
+              "hook_score",
+              "originality_score",
+              "believability_score",
+              "emotional_score",
+              "conflict_score",
+              "ending_score",
+              "visual_score",
+          ]
+          CRITIC_MIN_AXIS = 7
+          CRITIC_MIN_AVG = 6.8
 
-          VALIDATION PROBLEM:
-          {issue}
+          def critic_average(critique):
+              scores = []
+              for key in CRITIC_SCORE_KEYS:
+                  value = critique.get(key)
+                  if not isinstance(value, int) or isinstance(value, bool):
+                      return 0.0
+                  if value < 0 or value > 10:
+                      return 0.0
+                  scores.append(value)
+              return sum(scores) / len(scores)
 
-          STORY JSON:
-          {json.dumps(story, ensure_ascii=False)}
+          def effective_critic_pass(critique):
+              if not isinstance(critique, dict):
+                  return False
+              average = critic_average(critique)
+              all_axes_pass = all(
+                  critique.get(key, -1) >= CRITIC_MIN_AXIS
+                  for key in CRITIC_SCORE_KEYS
+              )
+              return all_axes_pass and average >= CRITIC_MIN_AVG
 
-          Rules:
-          - Change the minimum necessary to fix the stated problem.
-          - Do not rewrite the whole story.
-          - Do not introduce new characters, settings, or plot beats.
-          - Keep scene count and scene numbering identical.
-          - Return ONLY the repaired story JSON.
-          """
+          def normalize_critique(critique):
+              normalized = dict(critique)
+              average = critic_average(normalized)
+              deterministic_pass = effective_critic_pass(normalized)
+              model_pass = bool(normalized.get("pass"))
+              issues = list(normalized.get("issues") or [])
+
+              if model_pass != deterministic_pass:
+                  issues.append(
+                      "Critic boolean pass was inconsistent with its numeric scores; "
+                      "publication gate used deterministic score validation."
+                  )
+
+              normalized["pass"] = deterministic_pass
+              normalized["score_average"] = round(average, 2)
+              normalized["all_axes_at_least_7"] = all(
+                  normalized.get(key, -1) >= CRITIC_MIN_AXIS
+                  for key in CRITIC_SCORE_KEYS
+              )
+              normalized["model_pass"] = model_pass
+              normalized["issues"] = issues
+              return normalized
 
           def make_critic_prompt(story):
               return f"""
-          Review the following proposed YouTube Short as a professional short-film
-          editor. Be discriminating but fair: a competent, grounded micro-story
-          with a clear hook, real cost, and specific visuals should pass.
+          Ruthlessly review the following proposed YouTube Short as a professional
+          short-film editor.
 
           STORY:
           {json.dumps(story, ensure_ascii=False)}
@@ -586,49 +663,51 @@ jobs:
           hook, originality, believability, emotional impact, conflict, ending,
           visual potential.
 
-          Set pass = true when ALL of the following hold:
-            - every score is >= {CRITIC_MIN_AXIS}, AND
-            - the average of the seven scores is >= {CRITIC_MIN_AVG}.
+          The publication system independently checks the seven numeric scores.
+          Mark pass=true ONLY when every score is >= 7 and the seven-score average
+          is at least 6.8. Never mark pass=true when any score is below 7.
 
-          Treat these as fatal flaws (score that axis <= 4 and pass = false):
-          - magical, supernatural, or miracle-like mechanisms
-          - random coincidence solving the plot
-          - child-rescue, illness-reveal, or anonymous-benefactor clichés
-          - implausible promotions or instant license/regulatory punishment
-          - no meaningful personal cost to the protagonist's choice
-          - setup/payoff disconnected (turning point not seeded earlier)
-
-          Also penalize but do NOT treat as automatically fatal:
+          Be especially strict about:
           - generic opening
-          - binary honesty dilemma (deduct on conflict and originality, but a
-            well-executed one with real cost can still reach {CRITIC_MIN_AXIS})
-          - predictable ending
+          - generic protagonist
+          - artificial moral dilemmas
+          - no meaningful personal cost
+          - random coincidence
+          - weak setup/payoff connection
+          - convenient reveals
+          - predictable endings
+          - common AI emotional tropes
           - visuals that are generic rather than story-specific
+          - supernatural, magical, or miracle-like mechanisms
+          - professional stakes that depend on implausible policy or instant punishment
+          - binary "lie or do the right thing" conflicts with no nuanced alternative
+          - emotional resolution that happens only because another character suddenly
+            becomes forgiving
 
-          For every score below {CRITIC_MIN_AXIS}, explain the exact structural
-          problem and what must change.
+          Treat magical explanations, random coincidences, child-rescue clichés,
+          illness reveals, anonymous benefactors, implausible promotions/licenses,
+          and endings that simply reward honesty as fatal flaws.
+
+          For every score below 7, explain the exact structural problem and what
+          must change.
 
           Return ONLY critic JSON.
           """
 
           # ============================================================
-          # BOUNDED STORY SEARCH (fixed)
+          # BOUNDED STORY SEARCH
           # ============================================================
 
-          best_candidate = None          # best locally-valid candidate seen
-          best_critique = None           # its critic report
-          best_average = -1.0            # its average score
-          last_critique = None           # most recent critique (any candidate)
-          last_local_issue = None        # most recent local-check issue
+          # The critical fix: once a premise fails quality review, do NOT keep
+          # repairing the same premise. Generate a genuinely different story.
+          # This prevents the repeated-mail/key/slot style failures seen in
+          # previous runs and uses far fewer tokens than repeated rewrites.
 
-          def critic_average(critique):
-              keys = [
-                  "hook_score", "originality_score", "believability_score",
-                  "emotional_score", "conflict_score", "ending_score",
-                  "visual_score",
-              ]
-              values = [critique.get(k, 0) for k in keys]
-              return sum(values) / len(values)
+          approved_story = None
+          approved_quality_report = None
+          last_story = None
+          last_critique = None
+          rejection_log = []
 
           for attempt_number in range(1, MAX_STORY_ATTEMPTS + 1):
               print("=" * 60)
@@ -640,7 +719,7 @@ jobs:
                   temperature = 0.68
               else:
                   prompt = make_fresh_story_prompt(
-                      best_candidate or {},
+                      last_story or {},
                       last_critique or {"issues": []},
                       attempt_number,
                   )
@@ -648,49 +727,32 @@ jobs:
 
               try:
                   candidate = call_groq(
-                      prompt, STORY_SCHEMA,
+                      prompt,
+                      STORY_SCHEMA,
                       temperature=temperature,
                       max_tokens=2200,
                   )
               except Exception as exc:
                   print(f"Candidate generation failed: {exc}")
+                  rejection_log.append({
+                      "attempt": attempt_number,
+                      "stage": "generation",
+                      "issues": [str(exc)],
+                  })
+                  last_story = {}
                   last_critique = {"pass": False, "issues": [str(exc)]}
                   continue
 
+              last_story = candidate
+
               local_issue = local_story_check(candidate)
-
-              # One targeted repair pass for locally-failed candidates.
-              if local_issue and api_calls < MAX_API_CALLS:
-                  print("CANDIDATE LOCAL CHECK:", local_issue)
-                  print("Attempting one targeted repair...")
-                  try:
-                      repaired = call_groq(
-                          make_repair_prompt(candidate, local_issue),
-                          STORY_SCHEMA,
-                          temperature=0.30,
-                          max_tokens=2200,
-                      )
-                      repaired_issue = local_story_check(repaired)
-                      if repaired_issue is None:
-                          print("Repair succeeded.")
-                          candidate = repaired
-                          local_issue = None
-                      else:
-                          print(f"Repair failed local check: {repaired_issue}")
-                          last_local_issue = repaired_issue
-                          last_critique = {"pass": False, "issues": [repaired_issue]}
-                          continue
-                  except Exception as exc:
-                      print(f"Repair call failed: {exc}")
-                      last_local_issue = local_issue
-                      last_critique = {"pass": False, "issues": [local_issue]}
-                      continue
-
               if local_issue:
-                  # No budget or repair not applicable: skip this candidate
-                  # without corrupting the best-so-far state.
                   print("CANDIDATE LOCAL CHECK:", local_issue)
-                  last_local_issue = local_issue
+                  rejection_log.append({
+                      "attempt": attempt_number,
+                      "stage": "local",
+                      "issues": [local_issue],
+                  })
                   last_critique = {"pass": False, "issues": [local_issue]}
                   continue
 
@@ -699,7 +761,7 @@ jobs:
               print("=" * 60)
 
               try:
-                  critique = call_groq(
+                  raw_critique = call_groq(
                       make_critic_prompt(candidate),
                       CRITIC_SCHEMA,
                       temperature=0.10,
@@ -707,91 +769,97 @@ jobs:
                   )
               except Exception as exc:
                   print(f"Critic call failed: {exc}")
+                  rejection_log.append({
+                      "attempt": attempt_number,
+                      "stage": "critic",
+                      "issues": [str(exc)],
+                  })
                   last_critique = {"pass": False, "issues": [str(exc)]}
                   continue
 
-              print(json.dumps(critique, ensure_ascii=False, indent=2))
+              critique = normalize_critique(raw_critique)
               last_critique = critique
 
-              avg = critic_average(critique)
-              print(f"Average critic score: {avg:.2f} (pass={critique.get('pass')})")
+              print(json.dumps(critique, ensure_ascii=False, indent=2))
+              print(
+                  f"Deterministic quality result: pass={critique['pass']} "
+                  f"average={critique['score_average']:.2f}"
+              )
 
-              if avg > best_average:
-                  best_average = avg
-                  best_candidate = candidate
-                  best_critique = critique
-
-              if critique.get("pass"):
-                  print("CANDIDATE PASSED QUALITY REVIEW")
+              if critique["pass"]:
+                  approved_story = candidate
+                  approved_quality_report = critique
+                  print("CANDIDATE PASSED DETERMINISTIC QUALITY GATE")
                   break
 
+              rejection_log.append({
+                  "attempt": attempt_number,
+                  "stage": "quality",
+                  "score_average": critique["score_average"],
+                  "issues": critique.get("issues", []),
+              })
+
               print("CANDIDATE REJECTED — GENERATING A FRESH PREMISE")
+
               if attempt_number < MAX_STORY_ATTEMPTS:
                   time.sleep(2)
 
-          # ============================================================
-          # FINAL PUBLICATION DECISION (fixed)
-          # ============================================================
-
-          if best_candidate is None:
+          if approved_story is None or approved_quality_report is None:
+              summary = {
+                  "attempts": MAX_STORY_ATTEMPTS,
+                  "last_critique": last_critique,
+                  "rejections": rejection_log,
+              }
               raise RuntimeError(
-                  "No locally-valid story candidate was produced after "
-                  f"{MAX_STORY_ATTEMPTS} attempts. "
-                  "Last local issue: " + json.dumps(last_local_issue, ensure_ascii=False)
+                  "No publication-ready story passed all deterministic gates after "
+                  f"{MAX_STORY_ATTEMPTS} independent candidates. "
+                  "Nothing will be published. Diagnostic summary: "
+                  + json.dumps(summary, ensure_ascii=False)
               )
 
-          # Re-validate the BEST candidate (not the last one seen).
-          final_local_issue = local_story_check(best_candidate)
+          story = approved_story
+          quality_report = approved_quality_report
+
+          # The exact candidate selected for publication must still pass the
+          # hard local validator immediately before any production output is made.
+          final_local_issue = local_story_check(story)
           if final_local_issue:
-              # Should not happen: we only store locally-valid candidates.
               raise RuntimeError(
-                  "Best candidate unexpectedly failed local validation: "
+                  "Approved story unexpectedly failed final local validation: "
                   + final_local_issue
               )
 
-          published_story = best_candidate
-          quality_report = best_critique
-          fully_passed = bool(best_critique and best_critique.get("pass"))
-
-          if not fully_passed:
-              # Best-effort publication: we exhausted attempts but have a
-              # locally-valid, highest-scoring candidate. Publish it with a
-              # clear flag so downstream steps / humans can see it wasn't a
-              # clean pass. This avoids hard workflow failure.
-              print("=" * 60)
-              print("NO CLEAN PASS — PUBLISHING BEST-EFFORT CANDIDATE")
-              print("=" * 60)
-              print("Best average score:", round(best_average, 2))
-              print(
-                  "Issues:",
-                  json.dumps(
-                      (best_critique or {}).get("issues", []),
-                      ensure_ascii=False,
-                  ),
+          # Never trust an LLM boolean. Recompute the publication decision locally.
+          if not effective_critic_pass(quality_report):
+              raise RuntimeError(
+                  "Internal safety check failed: approved quality report does not "
+                  "satisfy deterministic score thresholds."
               )
-              quality_report = dict(best_critique or {})
-              quality_report["pass"] = False
-              quality_report["best_effort"] = True
-              quality_report["best_average"] = round(best_average, 2)
 
           # ============================================================
-          # FINAL PRODUCTION DATA
+          # FINAL LOCAL VALIDATION + PRODUCTION DATA
           # ============================================================
 
-          total = word_count(published_story)
+          total = word_count(story)
+
           duration = max(
               MIN_DURATION,
-              min(MAX_DURATION, round(total / WPM * 60)),
+              min(
+                  MAX_DURATION,
+                  round(total / WPM * 60),
+              ),
           )
 
-          scene_count = len(published_story["scenes"])
+          scene_count = len(story["scenes"])
           base_words = total // scene_count
           remainder = total % scene_count
 
           production_scenes = []
-          for index, scene in enumerate(published_story["scenes"]):
+
+          for index, scene in enumerate(story["scenes"]):
               scene_words = base_words + (1 if index < remainder else 0)
               seconds = max(3, round(scene_words / WPM * 60))
+
               production_scenes.append({
                   "scene": scene["scene"],
                   "duration_seconds": seconds,
@@ -813,30 +881,40 @@ jobs:
           OUTPUT_DIR.mkdir(exist_ok=True)
 
           (OUTPUT_DIR / "story.json").write_text(
-              json.dumps(published_story, ensure_ascii=False, indent=2),
+              json.dumps(story, ensure_ascii=False, indent=2),
               encoding="utf-8",
           )
+
           (OUTPUT_DIR / "quality_report.json").write_text(
               json.dumps(quality_report, ensure_ascii=False, indent=2),
               encoding="utf-8",
           )
+
           (OUTPUT_DIR / "scenes.json").write_text(
               json.dumps(
-                  {"duration_seconds": duration, "scenes": production_scenes},
+                  {
+                      "duration_seconds": duration,
+                      "scenes": production_scenes,
+                  },
                   ensure_ascii=False,
                   indent=2,
               ),
               encoding="utf-8",
           )
+
           (OUTPUT_DIR / "title.txt").write_text(
-              published_story["title"] + "\n", encoding="utf-8",
-          )
-          (OUTPUT_DIR / "script.txt").write_text(
-              " ".join(s["narration"] for s in published_story["scenes"]) + "\n",
+              story["title"] + "\n",
               encoding="utf-8",
           )
+
+          (OUTPUT_DIR / "script.txt").write_text(
+              " ".join(scene["narration"] for scene in story["scenes"]) + "\n",
+              encoding="utf-8",
+          )
+
           (OUTPUT_DIR / "description.txt").write_text(
-              published_story["description"] + "\n", encoding="utf-8",
+              story["description"] + "\n",
+              encoding="utf-8",
           )
 
           # ============================================================
@@ -844,11 +922,11 @@ jobs:
           # ============================================================
 
           history.append({
-              "title": published_story["title"],
-              "premise": published_story["description"],
-              "setting": published_story["setting"],
-              "passed_critic": fully_passed,
-              "best_average": round(best_average, 2) if best_average >= 0 else None,
+              "title": story["title"],
+              "premise": story["description"],
+              "setting": story["setting"],
+              "passed_critic": True,
+              "score_average": quality_report["score_average"],
           })
 
           HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
@@ -858,14 +936,14 @@ jobs:
           )
 
           print("=" * 60)
-          print("STORY PUBLISHED" + ("" if fully_passed else " (BEST-EFFORT)"))
+          print("STORY APPROVED — DETERMINISTIC QUALITY GATE PASSED")
           print("=" * 60)
-          print("Title:", published_story["title"])
+          print("Title:", story["title"])
           print("Words:", total)
           print("Duration:", duration, "seconds")
           print("Scenes:", scene_count)
           print("Groq calls used:", api_calls)
-          print("Fully passed critic:", fully_passed)
+          print("Deterministic quality gate: PASS")
           print("Quality:")
           print(json.dumps(quality_report, ensure_ascii=False, indent=2))
           PY
