@@ -724,8 +724,8 @@ jobs:
               if quality_report["pass"]:
                   break
 
-          # Never silently publish a story that the professional critic rejected.
-          # The previous workflow allowed failed critic results to become artifacts.
+          # NEVER bypass an independent quality rejection with local validation.
+          # A story may be published only when the latest critic explicitly passes it.
           final_local_issue = local_story_check(story)
           if final_local_issue:
               raise RuntimeError(
@@ -734,40 +734,14 @@ jobs:
               )
 
           if not quality_report.get("pass"):
-              if api_calls < MAX_API_CALLS:
-                  print("=" * 60)
-                  print("FINAL PREMISE REBUILD")
-                  print("=" * 60)
-
-                  story = call_groq(
-                      make_repair_prompt(
-                          story,
-                          quality_report,
-                          "Final rebuild: replace the weak premise, conflict, turning point, or ending wherever necessary. Do not preserve a flawed mechanism merely for continuity.",
-                      ),
-                      STORY_SCHEMA,
-                      temperature=0.68,
-                      max_tokens=4500,
+              raise RuntimeError(
+                  "Story failed the publication quality gate after all bounded repair attempts. "
+                  "An independent critic did not approve the final story. Issues: "
+                  + json.dumps(
+                      quality_report.get("issues", []),
+                      ensure_ascii=False,
                   )
-
-                  final_local_issue = local_story_check(story)
-                  if final_local_issue:
-                      raise RuntimeError(
-                          "Final story rebuild failed local validation: "
-                          + final_local_issue
-                      )
-
-                  quality_report = dict(quality_report)
-                  quality_report["publish_gate"] = "hard-local-validation-pass-after-final-rebuild"
-                  quality_report["quality_review_note"] = (
-                      "The final rebuild passed all hard local checks, but no additional "
-                      "independent critic call remained within the bounded API budget."
-                  )
-              else:
-                  raise RuntimeError(
-                      "Story failed the publication quality gate after all bounded repair attempts: "
-                      + json.dumps(quality_report.get("issues", []), ensure_ascii=False)
-                  )
+              )
 
           # ============================================================
           # FINAL LOCAL VALIDATION + PRODUCTION DATA
