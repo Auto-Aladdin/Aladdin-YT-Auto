@@ -44,13 +44,10 @@ jobs:
           MAX_DURATION = 180
 
           # Keep the run deliberately small for the documented 8K TPM ceiling.
-          # Maximum normal path: 4 calls across 2 independent story candidates.
-          # 1) story candidate A
-          # 2) critic A
-          # 3) fresh story candidate B
-          # 4) critic B
-          MAX_API_CALLS = 4
-          MAX_STORY_ATTEMPTS = 2
+          # Maximum normal path: 6 calls across 3 independent story candidates.
+          # Each candidate is generation + critic. No repair loop.
+          MAX_API_CALLS = 6
+          MAX_STORY_ATTEMPTS = 3
           MIN_SECONDS_BETWEEN_CALLS = 20.0
 
           API_KEY = os.environ["GROQ_API_KEY"]
@@ -436,18 +433,9 @@ jobs:
                   if len(str(story.get(field, "")).split()) < minimum_words:
                       return f"{field} is too vague."
 
-              hook_text = str(story.get("hook", "")).strip().lower()
-              first_scene = str(scenes[0].get("narration", "")).strip().lower()
-              if len(hook_text.split()) < 10:
-                  return "Hook is too short to establish a concrete unanswered question."
-
-              generic_starts = (
-                  "rain ", "the rain ", "morning ", "it was ", "the sun ",
-                  "as the sun ", "on a quiet ", "on an ordinary ", "another day ",
-                  "the shop was ",
-              )
-              if first_scene.startswith(generic_starts):
-                  return "Opening scene is too generic; start with a specific action, object, deadline, or problem."
+              hook_text = str(story.get("hook", "")).strip()
+              if len(hook_text.split()) < 8:
+                  return "Hook is too short to establish a concrete premise."
 
               generic_resolution_phrases = [
                   "new beginning", "promise of renewal", "felt the weight lift",
@@ -679,7 +667,7 @@ jobs:
                   prompt,
                   STORY_SCHEMA,
                   temperature=temperature,
-                  max_tokens=2600,
+                  max_tokens=2200,
               )
 
               local_issue = local_story_check(candidate)
@@ -697,7 +685,7 @@ jobs:
                   make_critic_prompt(candidate),
                   CRITIC_SCHEMA,
                   temperature=0.10,
-                  max_tokens=1100,
+                  max_tokens=900,
               )
 
               print(json.dumps(critique, ensure_ascii=False, indent=2))
