@@ -478,21 +478,28 @@ jobs:
                     Create ONE original faceless YouTube Short package.
 
                     IMPORTANT:
-                    - This is for an automated daily channel.
-                    - The first sentence must create immediate curiosity with a clear, concrete problem.
+                    - This is for an automated daily channel, so the result must feel like a REAL SHORT STORY, not a summary, essay, lesson, or list of events.
+                    - Start the narration in the middle of something happening: name the protagonist, show a concrete action, and reveal a problem or important stake immediately. Do NOT begin with generic atmosphere such as "the night was quiet", "the sun was setting", "Elena entered the room", or a description of a place unless something important is already happening.
+                    - The first spoken sentence must make the viewer ask a clear question such as "What happened?", "What will she do?", or "Why does this matter?" while remaining easy to understand.
                     - Use simple everyday English that an international viewer can understand on the first listen.
-                    - Make the story easy to follow without knowing anything before Scene 1.
-                    - Keep one main character, one clear relationship, one concrete goal, one real obstacle, one important choice, and one believable consequence.
-                    - The emotional payoff should come from the action and consequence, not from a speech about life.
+                    - Write like a narrator telling a true-to-life human story: specific people, specific actions, specific objects, clear cause and effect, and natural consequences.
+                    - Keep one main character, one meaningful relationship, one concrete goal, one real obstacle, one important choice, and one believable consequence.
+                    - Introduce the person's situation naturally through action instead of explaining their whole background.
+                    - Put the main problem on screen by Scene 1 or Scene 2, and make the stakes understandable without hidden context.
+                    - Every scene should answer or create a question that naturally leads to the next scene. Avoid disconnected scene summaries.
+                    - The emotional payoff should come from what the character does and what happens because of it, not from a speech about life.
+                    - Avoid generic motivational formulas, fake twists, vague inspirational language, and endings that sound like a quote poster.
+                    - Prefer fresh everyday conflicts over stock tropes such as mysterious notes, anonymous benefactors, dangerous lenders, secret fortunes, or convenient strangers.
                     - Do not use fancy literary words, vague symbolism, confusing metaphors, or abstract language.
-                    - Prefer concrete verbs and visible actions such as opens, waits, carries, chooses, returns, fixes, leaves, calls, gives, and keeps.
+                    - Prefer concrete verbs and visible actions such as grabs, hides, repairs, misses, searches, carries, refuses, chooses, returns, fixes, leaves, calls, gives, and keeps.
                     - Avoid words like "reverie", "fragile", "tentative", "scars", "destiny", "fate", "healing", "poignant", or similar literary phrasing.
                     - Each narration must be exactly ONE natural spoken sentence. Do not use semicolons, em dashes, or multiple sentence-ending punctuation marks inside one scene.
                     - Prefer full names or names without titles; avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. inside narration when possible.
                     - Every scene must be easy to create from one cinematic still image.
                     - We will animate the still images with camera motion later.
                     - The story should work for a broad international audience.
-                    - No facial expressions are needed; emotion must be shown through actions, hands, posture, objects and setting.
+                    - No facial expressions are needed; emotion must be shown through actions, hands, posture, objects, body orientation, and setting.
+                    - Vary the opening style from story to story; examples such as "Ellina was repairing...", "Sam was already late when...", or "Daniel found..." are style references only, not templates to repeat.
 
                     CREATIVE SEEDS
                     Domain: {random.choice(DOMAINS)}
@@ -533,7 +540,8 @@ jobs:
                     - Scenes must form one continuous causal story with no unexplained jumps.
                     - Choose the scene count based on the story, not a fixed template: use fewer scenes for a tight story and more when a meaningful beat needs its own visual, within the 7-16 validated range.
                     - Every scene must add new information, action, decision, consequence, or emotional change; never create filler scenes.
-                    - Scene 1 must clearly introduce who is doing what and why it matters.
+                    - Scene 1 must name or clearly identify the protagonist, show a specific action, and reveal the immediate problem or stakes in the same sentence. It must feel like the beginning of a story, not the beginning of a location description.
+                    - Scene 2 should make the problem more concrete, and Scene 3 should make the main goal or difficult choice unmistakable.
                     - Scene 2-3 establish the human problem in concrete terms.
                     - Middle scenes show the choice and its immediate cost.
                     - Final scenes show the real consequence and a believable emotional payoff.
@@ -546,10 +554,10 @@ jobs:
                     - Concrete goal stated or obvious from the first three scenes.
                     - Real external obstacle that can be seen or understood immediately.
                     - Two plausible options with different costs.
-                    - The chosen option creates a believable consequence.
-                    - The ending changes the situation without a magical reward.
+                    - The chosen option creates a believable consequence that follows directly from the choice.
+                    - The ending changes the situation through a believable human consequence, not luck, magic, or an unexplained reward.
                     - No preachy moral at the end.
-                    - The final narration should land naturally in one memorable sentence.
+                    - The final narration should land naturally on what changed, not on a generic life lesson.
                     - A viewer should be able to retell the story in 2-3 simple sentences after hearing it once.
 
                     BANNED:
@@ -766,10 +774,20 @@ jobs:
 
           for index, scene in enumerate(story["scenes"], 1):
               output = IMAGES / f"scene_{index:02d}.png"
+              visual_anchor = (
+                  f"Character continuity: {story['protagonist']['name']}, age {story['protagonist']['age']}, "
+                  f"{story['protagonist']['role']}, {story['protagonist']['visual_identity']}. "
+              )
               prompt = (
-                  scene["visual_prompt"]
+                  visual_anchor
+                  + scene["visual_prompt"]
                   + ", vertical 9:16, cinematic photography, realistic materials, "
-                    "natural lighting, faceless composition, no text, no watermark"
+                    "natural lighting, physically plausible human anatomy, correct head-neck-spine alignment, "
+                    "natural body proportions, natural hands and fingers, consistent clothing and character appearance, "
+                    "head and torso facing the same direction unless the action clearly requires otherwise, "
+                    "faceless composition with the face turned away, cropped, or naturally obscured, "
+                    "no distorted limbs, no twisted neck, no extra fingers, no duplicate body parts, "
+                    "no readable text in props, no watermark"
               )
 
               encoded = urllib.parse.quote(prompt, safe="")
