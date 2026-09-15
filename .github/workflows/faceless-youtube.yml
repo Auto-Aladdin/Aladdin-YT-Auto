@@ -49,7 +49,7 @@ jobs:
           MAX_API_CALLS = 18
           MIN_SECONDS_BETWEEN_CALLS = 2.0
           MAX_API_RETRIES = 2
-          HTTP_TIMEOUT_SECONDS = 45
+          HTTP_TIMEOUT_SECONDS = 40
           INTERNAL_DEADLINE_SECONDS = 15 * 60
 
           API_KEY = os.environ["GROQ_API_KEY"]
@@ -239,7 +239,9 @@ jobs:
                           "role": "system",
                           "content": (
                               "Return ONLY valid JSON. No markdown, no commentary, no code fences. "
-                              "Follow the requested JSON shape exactly."
+                              "Follow the requested JSON shape exactly. "
+                              "When JSON Object Mode is used, return one top-level JSON object, "
+                              "never a top-level array."
                           ),
                       },
                       {"role": "user", "content": prompt},
@@ -386,6 +388,11 @@ jobs:
               },
           }
 
+          # Kept as a documented reference to the intended story shape.
+          # Story calls intentionally use JSON Object Mode plus local normalization,
+          # because this model can occasionally emit a one-item array under the
+          # complex nested story shape, which otherwise causes a Groq HTTP 400 before
+          # Python can normalize it. Premises and critic remain strict-schema calls.
           STORY_SCHEMA = {
               "name": "publication_story",
               "schema": {
@@ -481,6 +488,33 @@ jobs:
 
           def story_text(story):
               return json.dumps(story, ensure_ascii=False).lower()
+
+          def normalize_story_response(data):
+              """
+              JSON Object Mode guarantees valid JSON, not the exact
+              structure. Some model generations may wrap a single
+              story object in a one-item array. Normalize only that
+              harmless wrapper; reject anything ambiguous.
+              """
+              if isinstance(data, dict):
+                  return data
+
+              if (
+                  isinstance(data, list)
+                  and len(data) == 1
+                  and isinstance(data[0], dict)
+              ):
+                  print(
+                      "[normalize] Story response was a one-item array; "
+                      "unwrapped the story object.",
+                      flush=True,
+                  )
+                  return data[0]
+
+              raise RuntimeError(
+                  "Story response must be a JSON object. "
+                  f"Received {type(data).__name__}."
+              )
 
           def has_banned(text):
               for phrase in BANNED_PHRASES:
@@ -645,7 +679,8 @@ jobs:
           SELECTED PREMISE:
           {json.dumps(p, ensure_ascii=False)}
 
-          Return ONLY one JSON object with these fields:
+          Return ONLY ONE TOP-LEVEL JSON OBJECT. NEVER return an array and NEVER wrap the story in a list.
+          The top-level object must contain exactly these fields:
           title, hook, setting, protagonist, desire, stakes, obstacle, choice, cost, consequence, turning_point, payoff,
           description, characters, scenes.
 
@@ -678,7 +713,7 @@ jobs:
               return f"""
           Repair this existing story because of ONE validation problem: {issue}
 
-          Return ONLY the same JSON object with all original story fields preserved.
+          Return ONLY ONE TOP-LEVEL JSON OBJECT containing the same story fields. NEVER return an array.
           Change only what is necessary to fix the validation problem.
           Do not replace the premise, relationship, setting, or central mechanism.
           Do not introduce any banned plot pattern. Keep 9-11 scenes and 150-260 words.
@@ -742,9 +777,9 @@ jobs:
                       story_prompt(selected),
                       temperature=0.64,
                       max_tokens=1800,
-                      response_schema=STORY_SCHEMA,
                       label=f"story-{attempt}",
                   )
+                  candidate = normalize_story_response(candidate)
                   normalize_scene_numbers(candidate)
                   issue = story_issue(candidate)
 
@@ -762,9 +797,9 @@ jobs:
                               repair_prompt(candidate, issue),
                               temperature=0.32,
                               max_tokens=1800,
-                              response_schema=STORY_SCHEMA,
                               label=f"local-repair-{attempt}",
                           )
+                          repaired = normalize_story_response(repaired)
                           normalize_scene_numbers(repaired)
                           candidate = repaired
                           issue = story_issue(candidate)
@@ -810,7 +845,7 @@ jobs:
           The replacement must have an adult relationship, concrete present-day goal, two legitimate options,
           persistent cost, earned turning point, imperfect payoff, and a distinctive plot-essential visual detail.
           No banned pattern from the story rules.
-          Return the complete JSON story object with all required fields.
+          Return ONLY ONE TOP-LEVEL JSON OBJECT with all required story fields. NEVER return an array.
 
           CRITIC:
           {json.dumps(critique, ensure_ascii=False)}
@@ -820,9 +855,9 @@ jobs:
                           """,
                           temperature=0.55,
                           max_tokens=1800,
-                          response_schema=STORY_SCHEMA,
                           label=f"structural-repair-{attempt}",
                       )
+                      repair = normalize_story_response(repair)
                       normalize_scene_numbers(repair)
                       repair_issue = story_issue(repair)
 
