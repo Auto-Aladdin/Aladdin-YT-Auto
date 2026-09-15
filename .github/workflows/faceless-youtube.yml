@@ -383,6 +383,27 @@ jobs:
           def words(text):
               return len(str(text).split())
 
+          def is_one_sentence(text):
+              value = str(text).strip()
+              if not value:
+                  return False
+              if ";" in value or "—" in value or "–" in value:
+                  return False
+              if not re.search(r"[.!?](?:[\"\'\)\]])*$", value):
+                  return False
+
+              # Do not mistake normal abbreviations for sentence endings.
+              check = re.sub(
+                  r"\b(?:Mr|Mrs|Ms|Dr|St|Prof|Sr|Jr|vs|e\.g|i\.e)\.",
+                  lambda m: m.group(0).replace(".", "<DOT>"),
+                  value,
+                  flags=re.IGNORECASE,
+              )
+
+              # A terminal punctuation mark may be followed by closing quotes or brackets.
+              check = re.sub(r"[.!?](?=[\"\'\)\]]*$)", "<END>", check)
+              return not bool(re.search(r"[.!?]\s+", check))
+
           def normalize_narration(text):
               """Keep a generated scene narration as one spoken TTS cue.
 
