@@ -43,10 +43,11 @@ jobs:
           MIN_DURATION = 45
           MAX_DURATION = 180
 
-          # Keep the run deliberately small for the documented 8K TPM ceiling.
-          # Maximum normal path: 6 calls across 3 independent story candidates.
-          # Each candidate is generation + critic. No repair loop.
-          MAX_API_CALLS = 6
+          # Keep the run deliberately bounded for Groq free-tier limits.
+          # Normal path: 6 calls across 3 candidates (generation + critic).
+          # A candidate that is otherwise structurally valid but too short may
+          # consume ONE additional targeted length-repair call before its critic.
+          MAX_API_CALLS = 9
           MAX_STORY_ATTEMPTS = 3
           MIN_SECONDS_BETWEEN_CALLS = 20.0
 
@@ -651,6 +652,32 @@ jobs:
               normalized["issues"] = issues
               return normalized
 
+          def make_length_repair_prompt(story):
+              current_words = word_count(story)
+              return f"""
+          Repair the following ORIGINAL story only because its narration is too short.
+
+          CURRENT WORD COUNT: {current_words}
+          REQUIRED FINAL WORD COUNT: {MIN_WORDS}-{MAX_WORDS}
+          TARGET: 140-240 spoken words when possible.
+
+          IMPORTANT:
+          - Keep the same title, protagonist, setting, central conflict, choice, cost,
+            consequence, turning point and payoff.
+          - Do NOT invent a new subplot.
+          - Do NOT add generic motivation, moral speeches, filler, or a call to action.
+          - Add only concrete actions, reactions, transitions, necessary context, and
+            cause-and-effect beats that make the EXISTING story more complete and cinematic.
+          - Preserve realistic human behavior and physical plausibility.
+          - Keep it faceless-filmable.
+          - Keep 7-12 scenes.
+          - The final narration MUST be at least {MIN_WORDS} words.
+          - Return ONLY corrected story JSON matching the supplied schema.
+
+          STORY:
+          {json.dumps(story, ensure_ascii=False)}
+          """
+
           def make_critic_prompt(story):
               return f"""
           Ruthlessly review the following proposed YouTube Short as a professional
@@ -746,7 +773,46 @@ jobs:
               last_story = candidate
 
               local_issue = local_story_check(candidate)
-              if local_issue:
+
+              # A short but otherwise valid candidate gets exactly one targeted
+              # expansion pass. This is the only repair allowed in the bounded
+              # candidate search; failed quality candidates still become fresh premises.
+              if local_issue and local_issue.startswith("Story is too short at "):
+                  print("CANDIDATE LENGTH CHECK:", local_issue)
+                  print("RUNNING ONE TARGETED LENGTH REPAIR")
+                  try:
+                      repaired = call_groq(
+                          make_length_repair_prompt(candidate),
+                          STORY_SCHEMA,
+                          temperature=0.35,
+                          max_tokens=2600,
+                      )
+                  except Exception as exc:
+                      print(f"Length repair failed: {exc}")
+                      rejection_log.append({
+                          "attempt": attempt_number,
+                          "stage": "length_repair",
+                          "issues": [str(exc)],
+                      })
+                      last_critique = {"pass": False, "issues": [str(exc)]}
+                      continue
+
+                  repaired_issue = local_story_check(repaired)
+                  if repaired_issue:
+                      print("REPAIRED CANDIDATE LOCAL CHECK:", repaired_issue)
+                      rejection_log.append({
+                          "attempt": attempt_number,
+                          "stage": "local_after_repair",
+                          "issues": [repaired_issue],
+                      })
+                      last_critique = {"pass": False, "issues": [repaired_issue]}
+                      continue
+
+                  candidate = repaired
+                  last_story = candidate
+                  print("LENGTH REPAIR PASSED — CONTINUING TO QUALITY REVIEW")
+
+              elif local_issue:
                   print("CANDIDATE LOCAL CHECK:", local_issue)
                   rejection_log.append({
                       "attempt": attempt_number,
