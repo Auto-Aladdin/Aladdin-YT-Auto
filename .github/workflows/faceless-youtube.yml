@@ -678,8 +678,6 @@ jobs:
               voice,
               "--rate",
               "+2%",
-              "--boundary",
-              "sentence",
               "--text",
               script,
               "--write-media",
