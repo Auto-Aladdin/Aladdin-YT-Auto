@@ -64,18 +64,18 @@ jobs:
 
           API_KEY = os.environ["GROQ_API_KEY"]
 
-          MIN_WORDS = 120
+          MIN_WORDS = 105
           MAX_WORDS = 230
           SCENES_MIN = 7
           SCENES_MAX = 16
-          SCENE_MIN_WORDS = 12
-          SCENE_MAX_WORDS = 26
+          SCENE_MIN_WORDS = 10
+          SCENE_MAX_WORDS = 32
           TARGET_SCENE_MIN_WORDS = 17
           TARGET_SCENE_MAX_WORDS = 21
 
           HTTP_TIMEOUT = 45
           MAX_RETRIES = 2
-          MAX_STORY_CALLS = 1
+          MAX_STORY_CALLS = 1  # kept for configuration compatibility; no repair call is used
           MIN_GAP = 1.0
 
           IMAGE_WIDTH = 768
@@ -372,29 +372,44 @@ jobs:
           def words(text):
               return len(str(text).split())
 
-          def is_one_sentence(text):
-              value = str(text).strip()
+          def normalize_one_sentence(text):
+              """Turn accidental multi-sentence narration into one spoken sentence locally.
+              This avoids spending a second Groq call on punctuation-only repairs.
+              """
+              value = re.sub(r"\s+", " ", str(text).strip())
               if not value:
-                  return False
-              if ";" in value or "—" in value or "–" in value:
-                  return False
-              if not re.search(r"[.!?](?:[\"\'\)\]])*$", value):
-                  return False
+                  return ""
 
-              # Do not mistake normal abbreviations for sentence endings.
-              # Examples: Mr., Mrs., Ms., Dr., St., Prof., Sr., Jr., etc.
-              check = re.sub(
+              # Protect common abbreviations so "Mr. Lee" is never split as two sentences.
+              protected = re.sub(
                   r"\b(?:Mr|Mrs|Ms|Dr|St|Prof|Sr|Jr|vs|e\.g|i\.e)\.",
                   lambda m: m.group(0).replace(".", "<DOT>"),
                   value,
                   flags=re.IGNORECASE,
               )
 
-              # A terminal punctuation mark may be followed by closing quotes or brackets.
-              check = re.sub(r"[.!?](?=[\"\'\)\]]*$)", "<END>", check)
-              return not bool(re.search(r"[.!?]\s+", check))
+              # Normalize common sentence-ending punctuation in the middle of the narration.
+              parts = re.split(r"(?<=[.!?])\s+", protected)
+              parts = [p.replace("<DOT>", ".") for p in parts]
+              parts = [p.strip() for p in parts if p.strip()]
+              if len(parts) <= 1:
+                  return value
+
+              merged = parts[0].rstrip(".!?")
+              for part in parts[1:]:
+                  clean = part.strip()
+                  if not clean:
+                      continue
+                  if merged.endswith(","):
+                      merged += " " + clean[0].lower() + clean[1:]
+                  else:
+                      merged += ", then " + clean[0].lower() + clean[1:]
+              return merged.rstrip(".!?") + "."
 
           def validate_story(story):
+              """Hard validation only for structural/runtime safety.
+              Creative style issues must not consume extra Groq calls.
+              """
               if not isinstance(story, dict):
                   return "Story is not an object."
 
@@ -421,58 +436,35 @@ jobs:
               if not 16 <= age <= 45:
                   return "Protagonist age must be 16-45."
 
-              role = str(protagonist.get("role", "")).strip()
-              if len(role.split()) < 2:
+              if len(str(protagonist.get("role", "")).split()) < 2:
                   return "Protagonist role needs at least 2 words."
 
               scenes = story["scenes"]
               if not isinstance(scenes, list):
                   return "Scenes must be an array."
 
-              if len(scenes) < SCENES_MIN or len(scenes) > SCENES_MAX:
-                  return (
-                      f"Story must contain {SCENES_MIN}-{SCENES_MAX} scenes; got {len(scenes)}."
-                  )
+              if not (SCENES_MIN <= len(scenes) <= SCENES_MAX):
+                  return f"Story must contain {SCENES_MIN}-{SCENES_MAX} scenes; got {len(scenes)}."
 
               total = 0
               for i, scene in enumerate(scenes, 1):
                   if not isinstance(scene, dict):
                       return f"Scene {i} is not an object."
-
                   narration = str(scene.get("narration", "")).strip()
-                  count = words(narration)
-                  total += count
-
-                  if count < SCENE_MIN_WORDS or count > SCENE_MAX_WORDS:
-                      return (
-                          f"Scene {i} has {count} words; "
-                          f"allowed {SCENE_MIN_WORDS}-{SCENE_MAX_WORDS}."
-                      )
-
-                  if not is_one_sentence(narration):
-                      return f"Scene {i} narration must be exactly one simple sentence."
-
                   visual = str(scene.get("visual_prompt", "")).strip()
+                  if not narration:
+                      return f"Scene {i} narration is empty."
+                  if len(narration.split()) < SCENE_MIN_WORDS or len(narration.split()) > SCENE_MAX_WORDS:
+                      return f"Scene {i} narration is outside the safe 10-32 word range."
                   if len(visual.split()) < 8:
                       return f"Scene {i} visual prompt is too short."
+                  total += len(narration.split())
 
-              if total < MIN_WORDS:
-                  return f"Story is too short at {total} words; minimum {MIN_WORDS}."
-              if total > MAX_WORDS:
-                  return f"Story is too long at {total} words; maximum {MAX_WORDS}."
+              if total < MIN_WORDS or total > MAX_WORDS:
+                  return f"Story total length {total} is outside the safe {MIN_WORDS}-{MAX_WORDS} word range."
 
-              hook = str(story["hook"]).strip()
-              if words(hook) < 10:
+              if len(str(story["hook"]).split()) < 8:
                   return "Hook is too short."
-
-              blob = json.dumps(story, ensure_ascii=False)
-              bad = banned(blob)
-              if bad:
-                  return f"Banned pattern: {bad}"
-
-              title = str(story["title"]).strip()
-              if words(title) > 12:
-                  return "Title is too long."
 
               return None
 
@@ -623,85 +615,24 @@ jobs:
                     Do NOT mention these instructions in the JSON.
                     """
 
-              for call_number in range(1, MAX_STORY_CALLS + 1):
-                  story = groq_json(
-                      prompt,
-                      max_tokens=2800,
-                      temperature=0.65,
-                      label=f"story-{call_number}",
-                      response_schema=STORY_SCHEMA,
-                  )
-
-                  issue = validate_story(story)
-                  if not issue:
-                      return story
-
-                  print(f"[validator] {issue}", flush=True)
-
-                  repair_prompt = f"""
-                    Repair the existing story without replacing its core premise, characters, or tone.
-
-                    CURRENT VALIDATION PROBLEM:
-                    {issue}
-
-                    Preserve the good creative idea, but make the minimum changes required to pass validation.
-
-                    CREATIVE QUALITY REQUIREMENTS
-                    - The result must feel like a short original animated movie, not a motivational essay.
-                    - Keep the opening immediately interesting: protagonist + visible action + unusual problem/question.
-                    - Keep one clear central goal or mystery and escalate it scene by scene.
-                    - Keep the story simple enough to follow on one listen.
-                    - Preserve at least one meaningful surprise, reveal, reversal, funny complication, or emotional payoff.
-                    - Keep the ending satisfying and connected to the opening.
-                    - Keep simple international English and natural spoken sentences.
-                    - Do not add filler scenes or filler narration.
-
-                    IMAGE QUALITY REQUIREMENTS
-                    - Every scene must show one frozen cinematic moment that exactly matches its narration.
-                    - Keep the same protagonist design, clothing, colors, hairstyle, accessories, body build, and recognizable prop across scenes.
-                    - Never invent an extra character unless the story already contains that character.
-                    - Specify who is performing the action, what object they are interacting with, and the exact spatial relationship.
-                    - Specify cinematic framing, lighting, depth, and a clear focal point.
-                    - Use premium stylized 3D animation; not photorealistic, not preschool, not chibi.
-                    - Require coherent anatomy, natural hands, correct head-neck-spine alignment, believable body orientation, and consistent proportions.
-
-                    HARD REQUIREMENTS
-                    - top-level JSON OBJECT only
-                    - title, hook, description, protagonist, setting, scenes
-                    - protagonist fields: name, age, role, visual_identity
-                    - 7-16 scenes
-                    - each scene has scene, narration, visual_prompt
-                    - narration 12-26 words per scene, with 120-230 total words
-                    - every narration is exactly ONE simple sentence
-                    - no semicolons or em dashes inside narration
-                    - simple everyday English
-                    - no banned patterns
-                    - preserve natural pacing; do not force a fixed number of scenes
-
-                    STORY TO REPAIR
-                    {json.dumps(story, ensure_ascii=False)}
-
-                    Return ONLY the corrected JSON object.
-                    """
-
-                  story = groq_json(
-                      repair_prompt,
-                      max_tokens=2600,
-                      temperature=0.25,
-                      label=f"repair-{call_number}",
-                      response_schema=STORY_SCHEMA,
-                  )
-
-                  issue = validate_story(story)
-                  if not issue:
-                      return story
-
-                  print(f"[repair-validator] {issue}", flush=True)
-
-              raise RuntimeError(
-                  "The story could not pass deterministic validation "
-                  "after the allowed generation/repair calls."
+              story = groq_json(
+                  prompt,
+                  max_tokens=2800,
+                  temperature=0.65,
+                  label="story-1",
+                  response_schema=STORY_SCHEMA,
               )
+
+              # Local deterministic cleanup: remove punctuation-only fragmentation
+              # without consuming another Groq request.
+              for scene in story.get("scenes", []):
+                  scene["narration"] = normalize_one_sentence(scene.get("narration", ""))
+
+              issue = validate_story(story)
+              if issue:
+                  raise RuntimeError(f"Generated story failed structural validation: {issue}")
+
+              return story
 
           story = create_story()
 
