@@ -37,17 +37,18 @@ jobs:
 
           MIN_WORDS = 105
           MAX_WORDS = 405
-          TARGET_MIN_WORDS = 140
-          TARGET_MAX_WORDS = 300
+          TARGET_MIN_WORDS = 160
+          TARGET_MAX_WORDS = 240
           WPM = 135
           MIN_DURATION = 45
           MAX_DURATION = 180
 
           # Keep the run deliberately bounded for Groq free-tier limits.
           # Worst case: 4 candidates x (generation + critic + one repair + repair critic) = 16 calls.
-          MAX_API_CALLS = 16
+          MAX_API_CALLS = 24
           MAX_STORY_ATTEMPTS = 4
           MAX_REPAIR_ROUNDS_PER_CANDIDATE = 1
+          MAX_LENGTH_REPAIRS_PER_CANDIDATE = 1
           MIN_SECONDS_BETWEEN_CALLS = 12.0
 
           API_KEY = os.environ["GROQ_API_KEY"]
@@ -141,6 +142,10 @@ jobs:
               "sudden promotion", "instant promotion", "scathing review", "regulatory investigation",
               "license revocation", "revoke her license", "revoke his license",
               "trapped in a freezer", "inside a freezer", "stuck in a freezer", "locked inside a freezer",
+              "stuck in an elevator", "trapped in an elevator", "elevator hatch", "emergency light",
+              "power failure", "blackout", "abandoned concert hall", "last performance",
+              "violin audition", "father's unfinished", "rooftop confession", "glowing receipt",
+              "red ribbon", "countdown clock", "ticking clock", "coffee shop dilemma",
           ]
 
           STORY_SCHEMA = {
@@ -421,16 +426,42 @@ jobs:
                       return f"Banned story pattern detected: {phrase}"
 
               required_quality = [
-                  ("protagonist", 5),
-                  ("desire", 5),
-                  ("stakes", 6),
-                  ("obstacle", 6),
-                  ("choice", 6),
-                  ("cost", 6),
-                  ("consequence", 6),
-                  ("turning_point", 6),
-                  ("payoff", 6),
+                  ("protagonist", 8),
+                  ("desire", 8),
+                  ("stakes", 8),
+                  ("obstacle", 8),
+                  ("choice", 8),
+                  ("cost", 8),
+                  ("consequence", 8),
+                  ("turning_point", 8),
+                  ("payoff", 8),
               ]
+
+              vague_protagonist_terms = {
+                  "someone", "somebody", "a person", "an employee", "a worker",
+                  "a young man", "a young woman", "a man", "a woman",
+                  "the protagonist", "the worker", "the employee", "the driver",
+              }
+              protagonist = " ".join(str(story.get("protagonist", "")).lower().split())
+              if any(term in protagonist for term in vague_protagonist_terms):
+                  return "protagonist is too vague; use a named adult plus a specific role or skill."
+
+              role_terms = {
+                  "repair", "mechanic", "tailor", "printer", "technician", "cashier",
+                  "cook", "baker", "bookbinder", "photographer", "gardener", "teacher",
+                  "nurse", "carpenter", "electrician", "designer", "driver", "clerk",
+                  "manager", "keeper", "artist", "craftsperson", "operator", "inspector",
+                  "janitor", "barber", "seamstress", "welder", "plumber", "roofer",
+                  "maker", "builder", "vendor", "shopkeeper", "installer", "technician",
+              }
+              if not any(term in protagonist for term in role_terms):
+                  combined_identity = (
+                      protagonist + " " +
+                      str(story.get("description", "")).lower() + " " +
+                      str(story.get("desire", "")).lower()
+                  )
+                  if not any(term in combined_identity for term in role_terms):
+                      return "protagonist is too vague; include a concrete adult role, skill, or responsibility."
 
               for field, minimum_words in required_quality:
                   if len(str(story.get(field, "")).split()) < minimum_words:
@@ -543,10 +574,17 @@ jobs:
               Let specific actions carry the emotion.
           15. The story must work as faceless footage using hands, backs, silhouettes,
               tools, objects, clothing, body language, reflections, and environments.
-          16. Target 150-260 spoken words. Absolute allowed range: 105-405 words.
+          16. Target {TARGET_MIN_WORDS}-{TARGET_MAX_WORDS} spoken words; do not finish
+              below the target. Absolute allowed range: 105-405 words.
           17. Use 8-12 scenes. Every scene must advance the plot.
           18. The first sentence/action must create a concrete unanswered question
               tied to the central problem.
+          19. Do not use blackout, elevator, concert, storm, red-ribbon, glowing-object,
+              ticking-clock, coffee-shop, train-platform, or rooftop-confession setups.
+          20. The protagonist identity must name the adult and state a concrete role,
+              skill, or responsibility; never use labels like "a young woman" alone.
+          21. Prefer practical cause-and-effect over theatrical emergencies. The story
+              should still work if all dramatic music and narration were removed.
 
           NOVELTY TEST
           If the concept can be summarized as "ordinary worker helps someone and is
@@ -576,8 +614,10 @@ jobs:
               'payoff': rejected_story.get('payoff', ''),
           }, ensure_ascii=False)}
 
-          WHY IT FAILED
-          {json.dumps(critique.get('issues', []), ensure_ascii=False)}
+          FAILED-CANDIDATE FINGERPRINT
+          The previous candidate failed. Do not reuse its central mechanism, setting,
+          occupation, relationship, visual motif, or ending pattern. Use the failure
+          only as a signal to move farther away from that story family.
 
           RECENT CHANNEL HISTORY
           {recent_text}
@@ -601,8 +641,11 @@ jobs:
           - No magic, miracle, prophecy, coincidence, benefactor, or sudden forgiveness.
           - No motivational speeches or moral-of-the-story paragraph.
           - No perfect ending; resolve the central problem with a believable consequence.
-          - 150-260 spoken words target, 105-405 absolute range.
+          - {TARGET_MIN_WORDS}-{TARGET_MAX_WORDS} spoken words target, 105-405 absolute range.
           - 8-12 scenes, faceless-filmable.
+          - Do not use blackout, elevator, concert, storm, red-ribbon, glowing-object,
+            ticking-clock, coffee-shop, train-platform, or rooftop-confession setups.
+          - Name the adult protagonist and give a concrete role, skill, or responsibility.
           - Begin with an action/problem that creates immediate curiosity.
 
           Return ONLY the new story JSON.
@@ -620,8 +663,11 @@ jobs:
           {json.dumps(critique.get('issues', []), ensure_ascii=False)}
 
           Repair every major issue by changing the underlying events where necessary.
-          You may replace the conflict, choice, turning point, and ending while keeping
-          the strongest useful character or setting details. Do not simply add adjectives.
+          When the critic says the premise is generic, replace the premise rather than
+          polishing it. When the average score is below 6, treat the draft as structurally
+          failed and rebuild the plot around a new practical mechanism. Do not simply add
+          adjectives or symbolic language. The repaired story must differ in at least three
+          of these: central problem, choice, consequence, visual motif, setting, or ending.
 
           ABSOLUTE RULES
           - Keep the situation realistic and physically plausible.
@@ -637,10 +683,33 @@ jobs:
             delivery-driver honesty dilemmas, or parent-vs-work dilemmas.
           - No generic moral speech, inspirational quote, or call to action.
           - Distinctive plot-specific visual motif.
-          - 150-260 spoken words target; 105-405 absolute range.
+          - {TARGET_MIN_WORDS}-{TARGET_MAX_WORDS} spoken words target; 105-405 absolute range.
           - 8-12 scenes, every scene advances the plot, faceless-filmable.
+          - Never use blackout, elevator, concert, storm, red-ribbon, glowing-object,
+            ticking-clock, coffee-shop, train-platform, or rooftop-confession setups.
+          - Name the adult protagonist and give a concrete role, skill, or responsibility.
 
           Return ONLY corrected story JSON.
+          """
+
+          def make_identity_repair_prompt(story, issue):
+              return f"""
+          Make a MINIMAL structural correction to this story because the local validator
+          found the following issue: {issue}
+
+          CURRENT STORY
+          {json.dumps(story, ensure_ascii=False)}
+
+          REQUIREMENTS
+          - Give the protagonist a specific adult name, approximate age, and concrete
+            role, trade, skill, responsibility, or habit.
+          - Preserve the story's existing plot, setting, conflict, choice, consequence,
+            turning point, payoff, and scene narration unless a tiny wording change is
+            necessary for consistency.
+          - Do not add a subplot, moral speech, new emotional reveal, magic, coincidence,
+            or a reward ending.
+          - Keep the protagonist faceless-filmable.
+          - Return ONLY corrected story JSON.
           """
 
           CRITIC_SCORE_KEYS = [
@@ -752,6 +821,9 @@ jobs:
           - predictable endings
           - common AI emotional tropes
           - visuals that are generic rather than story-specific
+          - emotional impact that depends on facial expressions, since this channel is faceless;
+            judge emotional impact from actions, choices, consequences, body language, sound,
+            and plot-specific objects instead
           - supernatural, magical, or miracle-like mechanisms
           - professional stakes that depend on implausible policy or instant punishment
           - binary "lie or do the right thing" conflicts with no nuanced alternative
@@ -767,6 +839,20 @@ jobs:
 
           Return ONLY critic JSON.
           """
+
+          def repair_is_too_similar(original, repaired):
+              keys = ["setting", "protagonist", "choice", "consequence", "turning_point", "payoff"]
+              same = 0
+              considered = 0
+              for key in keys:
+                  a = " ".join(str(original.get(key, "")).lower().split())
+                  b = " ".join(str(repaired.get(key, "")).lower().split())
+                  if not a or not b:
+                      continue
+                  considered += 1
+                  if a == b:
+                      same += 1
+              return considered >= 4 and same >= 4
 
           # ============================================================
           # QUALITY-GATED STORY SEARCH
@@ -797,7 +883,7 @@ jobs:
                       prompt,
                       STORY_SCHEMA,
                       temperature=0.72,
-                      max_tokens=2400,
+                      max_tokens=3200,
                   )
               except Exception as exc:
                   print(f"Candidate generation failed: {exc}")
@@ -811,6 +897,47 @@ jobs:
                   continue
 
               local_issue = local_story_check(candidate)
+
+              if local_issue and local_issue.startswith("Story is too short") and MAX_LENGTH_REPAIRS_PER_CANDIDATE > 0:
+                  print("CANDIDATE LENGTH CHECK:", local_issue)
+                  print("RUNNING ONE TARGETED LENGTH REPAIR")
+                  try:
+                      repaired_length = call_groq(
+                          make_length_repair_prompt(candidate),
+                          STORY_SCHEMA,
+                          temperature=0.45,
+                          max_tokens=2600,
+                      )
+                  except Exception as exc:
+                      print("Length repair failed:", exc)
+                  else:
+                      candidate = repaired_length
+                      local_issue = local_story_check(candidate)
+                      if local_issue:
+                          print("LENGTH-REPAIRED CANDIDATE LOCAL CHECK:", local_issue)
+                      else:
+                          print("LENGTH REPAIR PASSED — CONTINUING TO QUALITY REVIEW")
+
+              if local_issue and local_issue.startswith("protagonist is too vague"):
+                  print("CANDIDATE IDENTITY CHECK:", local_issue)
+                  print("RUNNING ONE TARGETED PROTAGONIST REPAIR")
+                  try:
+                      repaired_identity = call_groq(
+                          make_identity_repair_prompt(candidate, local_issue),
+                          STORY_SCHEMA,
+                          temperature=0.35,
+                          max_tokens=2100,
+                      )
+                  except Exception as exc:
+                      print("Identity repair failed:", exc)
+                  else:
+                      candidate = repaired_identity
+                      local_issue = local_story_check(candidate)
+                      if local_issue:
+                          print("IDENTITY-REPAIRED CANDIDATE LOCAL CHECK:", local_issue)
+                      else:
+                          print("IDENTITY REPAIR PASSED — CONTINUING TO QUALITY REVIEW")
+
               if local_issue:
                   print("CANDIDATE LOCAL CHECK:", local_issue)
                   rejection_log.append({
@@ -887,7 +1014,10 @@ jobs:
                           "issues": [str(exc)],
                       })
                   else:
-                      repaired_issue = local_story_check(repaired)
+                      if repair_is_too_similar(candidate, repaired):
+                          repaired_issue = "Structural repair was too similar to the failed story."
+                      else:
+                          repaired_issue = local_story_check(repaired)
                       if repaired_issue:
                           print("REPAIRED CANDIDATE LOCAL CHECK:", repaired_issue)
                           rejection_log.append({
