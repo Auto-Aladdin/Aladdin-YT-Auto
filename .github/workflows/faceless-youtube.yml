@@ -236,7 +236,7 @@ jobs:
                   "premises": {
                       "type": "array",
                       "minItems": 4,
-                      "maxItems": 4,
+                      "maxItems": 8,
                       "items": {
                           "type": "object",
                           "properties": {
@@ -268,6 +268,10 @@ jobs:
               "additionalProperties": False,
           }
 
+          # Keep Groq schema intentionally tolerant on narrative summary fields.
+          # GPT-OSS can occasionally omit one field even when prompted correctly; missing
+          # narrative fields are repaired/validated deterministically after JSON parsing
+          # instead of causing a hard Groq HTTP 400.
           STORY_SCHEMA = {
               "type": "object",
               "properties": {
@@ -311,12 +315,12 @@ jobs:
                   },
                   "scenes": {
                       "type": "array",
-                      "minItems": 9,
-                      "maxItems": 11,
+                      "minItems": 7,
+                      "maxItems": 12,
                       "items": {
                           "type": "object",
                           "properties": {
-                              "scene": {"type": "integer", "minimum": 1, "maximum": 11},
+                              "scene": {"type": "integer", "minimum": 1, "maximum": 12},
                               "narration": {"type": "string"},
                           },
                           "required": ["scene", "narration"],
@@ -324,11 +328,7 @@ jobs:
                       },
                   },
               },
-              "required": [
-                  "title", "hook", "setting", "protagonist", "desire", "stakes",
-                  "obstacle", "choice", "cost", "consequence", "turning_point",
-                  "payoff", "description", "characters", "scenes",
-              ],
+              "required": ["title", "hook", "setting", "protagonist", "scenes"],
               "additionalProperties": False,
           }
 
@@ -481,7 +481,23 @@ jobs:
               return json.dumps(story, ensure_ascii=False).lower()
 
 
+          NARRATIVE_FIELDS = [
+              "desire", "stakes", "obstacle", "choice", "cost",
+              "consequence", "turning_point", "payoff", "description",
+          ]
+
+          def normalize_story_object(story):
+              if not isinstance(story, dict):
+                  return story
+              # Make omitted optional narrative fields explicit so deterministic
+              # validation/targeted repair can handle them cleanly.
+              for field in NARRATIVE_FIELDS:
+                  story.setdefault(field, "")
+              story.setdefault("characters", [])
+              return story
+
           def local_story_check(story):
+              story = normalize_story_object(story)
               if not isinstance(story, dict):
                   return "Story is not an object."
 
@@ -580,8 +596,8 @@ jobs:
               emotion = rng.choice(EMOTIONS)
 
               return f"""
-          Generate FOUR radically different, compact premises for one original faceless YouTube Short.
-          Return four genuinely distinct story families; do not produce four versions of the same
+          Generate FOUR TO SIX radically different, compact premises for one original faceless YouTube Short.
+          Return genuinely distinct story families; do not produce four versions of the same
           workplace repair, deadline, records discrepancy, equipment failure, or safety scenario.
           This is candidate {attempt}. The final channel goal is high-quality human micro-drama,
           not motivational poetry and not a morality fable.
@@ -624,8 +640,8 @@ jobs:
           Avoid emergencies that exist only to manufacture tension.
           Avoid a protagonist being morally "tested" by an obviously virtuous choice.
 
-          Score each premise honestly for freshness. Select the strongest one, but keep all four
-          premises in the JSON so the next stage has genuine alternatives to choose from.
+          Score each premise honestly for freshness. Do NOT include a selected_index field.
+          Return only the premise array; Python will deterministically select the strongest eligible premise.
           """
 
 
@@ -654,6 +670,8 @@ jobs:
           8. Let emotion come from what happened, not from speeches.
           9. Keep every scene necessary.
           10. The story must work with faces never shown.
+          11. Fill every narrative field in the JSON, especially consequence: state the concrete
+              result caused by the choice and what remains different afterward.
 
           WORD/SCALE CONTRACT:
           - 9-11 scenes exactly.
@@ -724,10 +742,29 @@ jobs:
           existing plot. Preserve the protagonist, central mechanism, choice, cost, consequence,
           turning point, payoff and scene sequence unless a tiny consistency edit is unavoidable.
           For desire: state exactly what the protagonist must accomplish TODAY and what concrete
-          outcome they need. It must be observable, not a vague feeling such as "to make things right",
+          outcome they need.
+          For consequence: state exactly what changes because of the choice, including a concrete
+          result that remains true after the immediate action is finished. It must be observable, not a vague feeling such as "to make things right",
           "to prove themselves", "to help", or "to fix the situation".
           Do not add a subplot, reward ending, moral speech, coincidence, magic, child danger,
           illness, benefactor, bonus, promotion, or sentimental-object reveal.
+          Return ONLY corrected story JSON.
+
+          STORY:
+          {json.dumps(story, ensure_ascii=False)}
+          """
+
+          def make_banned_cleanup_prompt(story, issue):
+              return f"""
+          Remove ONLY the banned pattern from this otherwise usable story.
+
+          VALIDATION ISSUE: {issue}
+
+          Preserve the protagonist, setting, central problem, choice, cost, consequence,
+          turning point, payoff and scene order. Replace only the offending wording or beat
+          with a concrete, realistic action that serves the SAME plot purpose. Do not introduce
+          any new subplot, symbol, emergency, reward, coincidence, or new relationship.
+          Keep 9-11 scenes and 170-220 target words.
           Return ONLY corrected story JSON.
 
           STORY:
@@ -848,10 +885,10 @@ jobs:
                   premise_score, premise_index, premise = eligible[0]
                   print(f"SELECTED PREMISE {premise_index + 1}/{len(premises)} — score={premise_score}")
 
-                  candidate = call_groq(
+                  candidate = normalize_story_object(call_groq(
                       make_story_prompt(premise), STORY_SCHEMA,
                       temperature=0.68, max_tokens=3300
-                  )
+                  ))
 
                   local_issue = local_story_check(candidate)
                   if local_issue and local_issue.startswith("Story is too short"):
@@ -863,24 +900,51 @@ jobs:
                               temperature=0.38 if length_pass == 1 else 0.30,
                               max_tokens=3000
                           )
-                          candidate = repaired_length
+                          candidate = normalize_story_object(repaired_length)
                           local_issue = local_story_check(candidate)
                           if not local_issue:
                               print(f"LENGTH REPAIR PASSED ON PASS {length_pass}")
                               break
                           print(f"LENGTH REPAIR PASS {length_pass} RESULT:", local_issue)
 
-                  if local_issue and local_issue.startswith("desire is too vague"):
-                      print("CANDIDATE DESIRE CHECK:", local_issue)
-                      print("RUNNING ONE TARGETED DESIRE REPAIR")
-                      repaired_field = call_groq(
-                          make_field_repair_prompt(candidate, "desire", local_issue), STORY_SCHEMA,
-                          temperature=0.34, max_tokens=3000
+                  if local_issue:
+                      field_match = re.match(r"([a-z_]+) is too vague\.$", local_issue)
+                      if field_match:
+                          field_name = field_match.group(1)
+                          if field_name in NARRATIVE_FIELDS:
+                              print("CANDIDATE FIELD CHECK:", local_issue)
+                              print(f"RUNNING ONE TARGETED {field_name.upper()} REPAIR")
+                              repaired_field = call_groq(
+                                  make_field_repair_prompt(candidate, field_name, local_issue), STORY_SCHEMA,
+                                  temperature=0.34, max_tokens=3000
+                              )
+                              candidate = normalize_story_object(repaired_field)
+                              local_issue = local_story_check(candidate)
+                              if not local_issue:
+                                  print(f"{field_name.upper()} REPAIR PASSED — CONTINUING")
+                              else:
+                                  print(f"{field_name.upper()}-REPAIRED CANDIDATE LOCAL CHECK:", local_issue)
+
+                  # Length repair can accidentally introduce a banned phrase/pattern.
+                  # When that happens, clean the offending concept once rather than discarding
+                  # an otherwise viable candidate.
+                  if local_issue and (
+                      local_issue.startswith("Banned story pattern detected:")
+                      or local_issue.startswith("Cliche detected:")
+                      or local_issue.startswith("Convenient reward ending detected:")
+                  ):
+                      print("CANDIDATE CONTENT CHECK:", local_issue)
+                      print("RUNNING ONE TARGETED CONTENT CLEANUP")
+                      cleaned = call_groq(
+                          make_banned_cleanup_prompt(candidate, local_issue), STORY_SCHEMA,
+                          temperature=0.25, max_tokens=3000
                       )
-                      candidate = repaired_field
+                      candidate = normalize_story_object(cleaned)
                       local_issue = local_story_check(candidate)
-                      if local_issue:
-                          print("DESIRE-REPAIRED CANDIDATE LOCAL CHECK:", local_issue)
+                      if not local_issue:
+                          print("CONTENT CLEANUP PASSED — CONTINUING TO QUALITY REVIEW")
+                      else:
+                          print("CONTENT-CLEANED CANDIDATE LOCAL CHECK:", local_issue)
 
                   if local_issue:
                       print("CANDIDATE LOCAL CHECK:", local_issue)
@@ -913,25 +977,38 @@ jobs:
                   # replaced by the next independently generated premise.
                   if critique["score_average"] >= 4.5:
                       print("CANDIDATE FAILED — RUNNING ONE STRUCTURAL REPAIR")
-                      repaired = call_groq(
+                      repaired = normalize_story_object(call_groq(
                           make_repair_prompt(candidate, critique), STORY_SCHEMA,
                           temperature=0.58, max_tokens=3300
-                      )
+                      ))
 
                       repaired_issue = local_story_check(repaired)
                       if repaired_issue and repaired_issue.startswith("Story is too short"):
                           print("REPAIRED STORY TOO SHORT — RUNNING BOUNDED LENGTH REPAIR")
                           for length_pass in range(1, 3):
-                              repaired = call_groq(
+                              repaired = normalize_story_object(call_groq(
                                   make_length_repair_prompt(repaired), STORY_SCHEMA,
                                   temperature=0.36 if length_pass == 1 else 0.28,
                                   max_tokens=3000
-                              )
+                              ))
                               repaired_issue = local_story_check(repaired)
                               if not repaired_issue:
                                   print(f"REPAIRED LENGTH PASSED ON PASS {length_pass}")
                                   break
                               print(f"REPAIRED LENGTH PASS {length_pass} RESULT:", repaired_issue)
+
+                      if repaired_issue and (
+                          repaired_issue.startswith("Banned story pattern detected:")
+                          or repaired_issue.startswith("Cliche detected:")
+                          or repaired_issue.startswith("Convenient reward ending detected:")
+                      ):
+                          print("REPAIRED CONTENT CHECK:", repaired_issue)
+                          print("RUNNING ONE TARGETED REPAIR CONTENT CLEANUP")
+                          repaired = normalize_story_object(call_groq(
+                              make_banned_cleanup_prompt(repaired, repaired_issue), STORY_SCHEMA,
+                              temperature=0.24, max_tokens=3000
+                          ))
+                          repaired_issue = local_story_check(repaired)
 
                       if repaired_issue:
                           print("REPAIRED CANDIDATE LOCAL CHECK:", repaired_issue)
