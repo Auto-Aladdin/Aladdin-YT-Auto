@@ -68,7 +68,7 @@ jobs:
           MAX_WORDS = 230
           SCENES_MIN = 7
           SCENES_MAX = 16
-          SCENE_MIN_WORDS = 14
+          SCENE_MIN_WORDS = 12
           SCENE_MAX_WORDS = 26
           TARGET_SCENE_MIN_WORDS = 17
           TARGET_SCENE_MAX_WORDS = 21
@@ -518,7 +518,7 @@ jobs:
                       "scenes": [
                         {{
                           "scene": 1,
-                          "narration": "14-26 spoken words",
+                          "narration": "12-26 spoken words",
                           "visual_prompt": "cinematic faceless still-image prompt; include subject, environment, action, lighting and camera framing"
                         }}
                       ]
