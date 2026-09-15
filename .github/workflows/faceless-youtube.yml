@@ -64,7 +64,7 @@ jobs:
 
           API_KEY = os.environ["GROQ_API_KEY"]
 
-          MIN_WORDS = 170
+          MIN_WORDS = 120
           MAX_WORDS = 230
           SCENES_MIN = 7
           SCENES_MAX = 16
@@ -671,7 +671,7 @@ jobs:
                     - protagonist fields: name, age, role, visual_identity
                     - 7-16 scenes
                     - each scene has scene, narration, visual_prompt
-                    - narration 12-26 words per scene, with 170-230 total words
+                    - narration 12-26 words per scene, with 120-230 total words
                     - every narration is exactly ONE simple sentence
                     - no semicolons or em dashes inside narration
                     - simple everyday English
