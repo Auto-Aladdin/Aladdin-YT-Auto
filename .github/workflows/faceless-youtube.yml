@@ -66,8 +66,8 @@ jobs:
 
           MIN_WORDS = 170
           MAX_WORDS = 230
-          SCENES_MIN = 10
-          SCENES_MAX = 10
+          SCENES_MIN = 7
+          SCENES_MAX = 14
           SCENE_MIN_WORDS = 14
           SCENE_MAX_WORDS = 26
           TARGET_SCENE_MIN_WORDS = 17
@@ -224,8 +224,8 @@ jobs:
                       "setting": {"type": "string"},
                       "scenes": {
                           "type": "array",
-                          "minItems": 10,
-                          "maxItems": 10,
+                          "minItems": SCENES_MIN,
+                          "maxItems": SCENES_MAX,
                           "items": {
                               "type": "object",
                               "properties": {
@@ -375,7 +375,17 @@ jobs:
                   return False
               if not re.search(r"[.!?]$", value):
                   return False
-              return not bool(re.search(r"[.!?]\s+", value[:-1]))
+
+              # Do not mistake normal abbreviations for sentence endings.
+              # Examples: Mr., Mrs., Ms., Dr., St., Prof., Sr., Jr., etc.
+              check = re.sub(
+                  r"\b(?:Mr|Mrs|Ms|Dr|St|Prof|Sr|Jr|vs|e\.g|i\.e)\.",
+                  lambda m: m.group(0).replace(".", "<DOT>"),
+                  value[:-1],
+                  flags=re.IGNORECASE,
+              )
+
+              return not bool(re.search(r"[.!?]\s+", check))
 
           def validate_story(story):
               if not isinstance(story, dict):
@@ -412,8 +422,10 @@ jobs:
               if not isinstance(scenes, list):
                   return "Scenes must be an array."
 
-              if len(scenes) != 10:
-                  return "Story must contain exactly 10 scenes."
+              if len(scenes) < SCENES_MIN or len(scenes) > SCENES_MAX:
+                  return (
+                      f"Story must contain {SCENES_MIN}-{SCENES_MAX} scenes; got {len(scenes)}."
+                  )
 
               total = 0
               for i, scene in enumerate(scenes, 1):
@@ -472,6 +484,7 @@ jobs:
                     - Prefer concrete verbs and visible actions such as opens, waits, carries, chooses, returns, fixes, leaves, calls, gives, and keeps.
                     - Avoid words like "reverie", "fragile", "tentative", "scars", "destiny", "fate", "healing", "poignant", or similar literary phrasing.
                     - Each narration must be exactly ONE natural spoken sentence. Do not use semicolons, em dashes, or multiple sentence-ending punctuation marks inside one scene.
+                    - Prefer full names or names without titles; avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. inside narration when possible.
                     - Every scene must be easy to create from one cinematic still image.
                     - We will animate the still images with camera motion later.
                     - The story should work for a broad international audience.
@@ -508,12 +521,14 @@ jobs:
                     }}
 
                     SCENE REQUIREMENTS
-                    - Exactly 10 scenes.
+                    - Use 7-14 scenes, choosing the count that best fits the story.
                     - Every narration should target 17-21 words; hard validation allows 14-26.
                     - Total narration should target 180-210 words; hard validation allows 170-230.
                     - EVERY narration must be exactly ONE sentence.
                     - Keep each sentence direct and conversational, suitable for voice-over.
                     - Scenes must form one continuous causal story with no unexplained jumps.
+                    - Choose the scene count based on the story, not a fixed template: use fewer scenes for a tight story and more when a meaningful beat needs its own visual.
+                    - Every scene must add new information, action, decision, consequence, or emotional change; never create filler scenes.
                     - Scene 1 must clearly introduce who is doing what and why it matters.
                     - Scene 2-3 establish the human problem in concrete terms.
                     - Middle scenes show the choice and its immediate cost.
@@ -548,7 +563,7 @@ jobs:
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
                       prompt,
-                      max_tokens=2000,
+                      max_tokens=2800,
                       temperature=0.65,
                       label=f"story-{call_number}",
                       response_schema=STORY_SCHEMA,
@@ -579,18 +594,21 @@ jobs:
                     - description
                     - protagonist object with fields: name, age, role, visual_identity
                     - setting
-                    - exactly 10 scenes
+                    - between 7 and 14 scenes, choosing the count that fits the story
                     - each scene has scene, narration, visual_prompt
                     - each narration should target 17-21 words; hard allowance 14-26
                     - total narration should target 180-210 words; hard allowance 170-230
+                    - scene count must remain within 7-14 and should match the natural pacing of the story
+                    - never add filler scenes solely to reach a target count
                     - each narration must be exactly ONE simple sentence
+                    - avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. inside narration when possible
                     - no semicolons, em dashes, multiple sentences, literary wording, or vague metaphors
                     - use simple everyday English and concrete visible actions
                     - protagonist role is at least 2 words
                     - hook is 10-24 words
                     - description is 20-90 words
                     - all scenes are faceless-filmable
-                    - preserve all 10 scenes; never delete scenes to fix word count
+                    - preserve the story's natural scene count; do not add filler scenes or delete meaningful scenes just to hit a number
                     - no banned patterns
 
                     STORY:
@@ -601,7 +619,7 @@ jobs:
 
                   story = groq_json(
                       repair_prompt,
-                      max_tokens=1700,
+                      max_tokens=2600,
                       temperature=0.25,
                       label=f"repair-{call_number}",
                       response_schema=STORY_SCHEMA,
@@ -686,7 +704,7 @@ jobs:
                           url,
                           headers={
                               "Authorization": f"Bearer {POLLINATIONS_KEY}",
-                              "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V2",
+                              "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V3",
                               "Accept": "image/png,image/jpeg,image/webp,image/*",
                           },
                           method="GET",
