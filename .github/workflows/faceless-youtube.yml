@@ -64,18 +64,18 @@ jobs:
 
           API_KEY = os.environ["GROQ_API_KEY"]
 
-          MIN_WORDS = 105
+          MIN_WORDS = 170
           MAX_WORDS = 230
           SCENES_MIN = 7
           SCENES_MAX = 16
-          SCENE_MIN_WORDS = 10
-          SCENE_MAX_WORDS = 32
+          SCENE_MIN_WORDS = 12
+          SCENE_MAX_WORDS = 26
           TARGET_SCENE_MIN_WORDS = 17
           TARGET_SCENE_MAX_WORDS = 21
 
           HTTP_TIMEOUT = 45
           MAX_RETRIES = 2
-          MAX_STORY_CALLS = 1  # kept for configuration compatibility; no repair call is used
+          MAX_STORY_CALLS = 1
           MIN_GAP = 1.0
 
           IMAGE_WIDTH = 768
@@ -85,53 +85,50 @@ jobs:
           FPS = 30
 
           # ------------------------------------------------------------
-          # Story controls — designed for varied, youthful, broadly appealing animated entertainment.
+          # Story controls — intentionally simple and broad enough to
+          # create motivational / emotional / human-interest Shorts.
           # ------------------------------------------------------------
 
           DOMAINS = [
-              "young friends trying to solve an unexpected problem",
-              "older sibling helping a younger sibling through a strange situation",
-              "first-job pressure and an unexpected opportunity",
-              "roommates dealing with a surprising discovery",
-              "young creator trying to finish something important before it goes wrong",
-              "small neighborhood mystery with a personal connection",
-              "friendship tested by a clever mistake",
-              "young person protecting something that matters to someone else",
-              "ordinary day interrupted by an unusual challenge",
-              "small business run by a young adult facing an unexpected problem",
-              "quiet rivalry that turns into an unexpected partnership",
-              "young person making a risky but understandable choice",
+              "quiet personal responsibility",
+              "adult sibling relationship",
+              "mentor and former apprentice",
+              "neighbor helping neighbor",
+              "small business relationship",
+              "customer and specialist",
+              "community responsibility",
+              "friendship after a long misunderstanding",
+              "adult family obligation",
+              "ordinary person making a difficult choice",
           ]
 
           SETTINGS = [
-              "small apartment with a cluttered work desk",
-              "busy neighborhood street after school or work",
-              "tiny animation or design studio",
-              "back room of a family shop",
-              "community sports court",
-              "small repair garage",
-              "local bookstore with a hidden back room",
-              "rooftop workspace in a dense neighborhood",
-              "modest music practice room",
-              "small cafe kitchen before opening",
-              "shared workshop filled with tools and unfinished projects",
-              "quiet apartment hallway late in the evening",
+              "small repair shop",
+              "quiet neighborhood office",
+              "local library workroom",
+              "modest bakery before opening",
+              "small tailoring studio",
+              "community hall",
+              "neighborhood bookstore",
+              "shared workshop",
+              "small photography studio",
+              "local market back room",
           ]
 
           EMOTIONS = [
-              "curiosity",
+              "quiet determination",
+              "earned respect",
+              "bittersweet relief",
+              "acceptance",
+              "belonging",
+              "forgiveness",
+              "quiet pride",
               "surprise",
-              "playful tension",
-              "quiet bravery",
-              "relief",
-              "unexpected friendship",
-              "earned trust",
-              "wonder",
-              "clever satisfaction",
-              "warm humor",
           ]
 
           BANNED = [
+              "magic",
+              "magical",
               "supernatural",
               "miracle",
               "miraculous",
@@ -372,44 +369,29 @@ jobs:
           def words(text):
               return len(str(text).split())
 
-          def normalize_one_sentence(text):
-              """Turn accidental multi-sentence narration into one spoken sentence locally.
-              This avoids spending a second Groq call on punctuation-only repairs.
-              """
-              value = re.sub(r"\s+", " ", str(text).strip())
+          def is_one_sentence(text):
+              value = str(text).strip()
               if not value:
-                  return ""
+                  return False
+              if ";" in value or "—" in value or "–" in value:
+                  return False
+              if not re.search(r"[.!?](?:[\"\'\)\]])*$", value):
+                  return False
 
-              # Protect common abbreviations so "Mr. Lee" is never split as two sentences.
-              protected = re.sub(
+              # Do not mistake normal abbreviations for sentence endings.
+              # Examples: Mr., Mrs., Ms., Dr., St., Prof., Sr., Jr., etc.
+              check = re.sub(
                   r"\b(?:Mr|Mrs|Ms|Dr|St|Prof|Sr|Jr|vs|e\.g|i\.e)\.",
                   lambda m: m.group(0).replace(".", "<DOT>"),
                   value,
                   flags=re.IGNORECASE,
               )
 
-              # Normalize common sentence-ending punctuation in the middle of the narration.
-              parts = re.split(r"(?<=[.!?])\s+", protected)
-              parts = [p.replace("<DOT>", ".") for p in parts]
-              parts = [p.strip() for p in parts if p.strip()]
-              if len(parts) <= 1:
-                  return value
-
-              merged = parts[0].rstrip(".!?")
-              for part in parts[1:]:
-                  clean = part.strip()
-                  if not clean:
-                      continue
-                  if merged.endswith(","):
-                      merged += " " + clean[0].lower() + clean[1:]
-                  else:
-                      merged += ", then " + clean[0].lower() + clean[1:]
-              return merged.rstrip(".!?") + "."
+              # A terminal punctuation mark may be followed by closing quotes or brackets.
+              check = re.sub(r"[.!?](?=[\"\'\)\]]*$)", "<END>", check)
+              return not bool(re.search(r"[.!?]\s+", check))
 
           def validate_story(story):
-              """Hard validation only for structural/runtime safety.
-              Creative style issues must not consume extra Groq calls.
-              """
               if not isinstance(story, dict):
                   return "Story is not an object."
 
@@ -433,117 +415,96 @@ jobs:
               except Exception:
                   return "Invalid protagonist age."
 
-              if not 16 <= age <= 45:
-                  return "Protagonist age must be 16-45."
+              if not 21 <= age <= 70:
+                  return "Protagonist age must be 21-70."
 
-              if len(str(protagonist.get("role", "")).split()) < 2:
+              role = str(protagonist.get("role", "")).strip()
+              if len(role.split()) < 2:
                   return "Protagonist role needs at least 2 words."
 
               scenes = story["scenes"]
               if not isinstance(scenes, list):
                   return "Scenes must be an array."
 
-              if not (SCENES_MIN <= len(scenes) <= SCENES_MAX):
-                  return f"Story must contain {SCENES_MIN}-{SCENES_MAX} scenes; got {len(scenes)}."
+              if len(scenes) < SCENES_MIN or len(scenes) > SCENES_MAX:
+                  return (
+                      f"Story must contain {SCENES_MIN}-{SCENES_MAX} scenes; got {len(scenes)}."
+                  )
 
               total = 0
               for i, scene in enumerate(scenes, 1):
                   if not isinstance(scene, dict):
                       return f"Scene {i} is not an object."
+
                   narration = str(scene.get("narration", "")).strip()
+                  count = words(narration)
+                  total += count
+
+                  if count < SCENE_MIN_WORDS or count > SCENE_MAX_WORDS:
+                      return (
+                          f"Scene {i} has {count} words; "
+                          f"allowed {SCENE_MIN_WORDS}-{SCENE_MAX_WORDS}."
+                      )
+
+                  if not is_one_sentence(narration):
+                      return f"Scene {i} narration must be exactly one simple sentence."
+
                   visual = str(scene.get("visual_prompt", "")).strip()
-                  if not narration:
-                      return f"Scene {i} narration is empty."
-                  if len(narration.split()) < SCENE_MIN_WORDS or len(narration.split()) > SCENE_MAX_WORDS:
-                      return f"Scene {i} narration is outside the safe 10-32 word range."
                   if len(visual.split()) < 8:
                       return f"Scene {i} visual prompt is too short."
-                  total += len(narration.split())
 
-              if total < MIN_WORDS or total > MAX_WORDS:
-                  return f"Story total length {total} is outside the safe {MIN_WORDS}-{MAX_WORDS} word range."
+              if total < MIN_WORDS:
+                  return f"Story is too short at {total} words; minimum {MIN_WORDS}."
+              if total > MAX_WORDS:
+                  return f"Story is too long at {total} words; maximum {MAX_WORDS}."
 
-              if len(str(story["hook"]).split()) < 8:
+              hook = str(story["hook"]).strip()
+              if words(hook) < 10:
                   return "Hook is too short."
+
+              blob = json.dumps(story, ensure_ascii=False)
+              bad = banned(blob)
+              if bad:
+                  return f"Banned pattern: {bad}"
+
+              title = str(story["title"]).strip()
+              if words(title) > 12:
+                  return "Title is too long."
 
               return None
 
           def create_story():
               prompt = f"""
-                    Create ONE original stylized 3D animated YouTube Short package designed for strong viewer retention.
+                    Create ONE original faceless YouTube Short package.
 
-                    CORE MISSION — ENTERTAINMENT FIRST
-                    - Make this feel like a tiny animated movie compressed into 35-70 seconds.
-                    - The first seconds must create a strong "wait, what is happening?" reaction.
-                    - The viewer should want the next scene before the current scene finishes.
-                    - Build the story around curiosity, action, escalation, surprise, humor, emotion, cleverness, or a visually memorable problem.
-                    - Do NOT write a generic motivational story, workplace anecdote, school essay, moral lesson, or narrated slideshow.
-                    - The story may be funny, mysterious, adventurous, heartwarming, tense-but-safe, absurd, clever, or emotionally surprising.
-                    - Use heightened animated-world logic when useful: unusual inventions, strange discoveries, visual gags, impossible-looking situations with an understandable internal logic, or clever twists.
-                    - Do not become preschool-like, nursery-like, babyish, or overly cute; target teens, young adults, adults, and older viewers.
-
-                    VIRAL-STYLE RETENTION PRINCIPLES
-                    - Hook with a specific character, visible action, and an unanswered question or immediate problem.
-                    - Give the viewer a clear reason to keep watching within the first sentence and first visual.
-                    - Introduce one central mystery, challenge, object, secret, goal, or situation that the viewer can track.
-                    - Escalate every 1-2 scenes: something changes, gets harder, becomes stranger, or reveals new information.
-                    - Include at least one genuine surprise or reframe that changes what the viewer thought was happening.
-                    - End with a satisfying payoff that directly connects to the opening setup.
-                    - Prefer endings that make the viewer smile, gasp, laugh, feel something, or immediately want to replay the Short.
-                    - Never rely on "wait for the end" wording, clickbait claims, or a fake cliffhanger with no payoff.
-                    - Do not explain the moral; make the audience feel the meaning through the events.
-
-                    OPENING — SCENE 1 MUST SELL THE VIDEO
-                    - Start in the middle of an interesting action, not with background exposition.
-                    - Sentence 1 must naturally identify the protagonist by name, show what they are physically doing, and reveal the unusual problem, discovery, risk, or strange situation in the same sentence.
-                    - The first visual must show the same instant described by Sentence 1.
-                    - Make the hook concrete enough to understand even with the sound muted.
-                    - Avoid generic openings such as "Maya was having a normal day" or long descriptions of weather, buildings, rooms, or feelings.
-                    - Example style only: "Ellina was repairing the old delivery robot when it suddenly locked the door behind her."
-                    - Do not reuse the example or the same opening pattern every time.
-
-                    STORY ENGINE
-                    - Build a simple causal chain: hook -> immediate goal/question -> obstacle -> escalation -> harder choice -> consequence -> reveal/payoff.
-                    - Keep one primary protagonist and one or two important supporting characters maximum.
-                    - Give the protagonist a concrete goal that matters visually and emotionally.
-                    - Make the obstacle active, not merely descriptive.
-                    - Every scene must change the situation.
-                    - Avoid technical exposition that makes the viewer stop caring about the characters.
-                    - If technology, mystery, science, fantasy, or an invention appears, explain only what the viewer needs to understand the action.
-                    - Do not introduce many unrelated objects, characters, clues, or locations.
-                    - The viewer must be able to retell the whole story in 2-3 simple sentences after one listen.
-
-                    CHARACTER BIBLE — LOCK THIS BEFORE WRITING SCENES
-                    - Give the protagonist a memorable visual identity that can be recognized from silhouette and clothing alone.
-                    - Specify: approximate age, body build, hairstyle, hair color, skin tone, clothing colors, one distinctive garment/accessory, and one recognizable prop when appropriate.
-                    - Keep these details identical in every scene unless the plot explicitly changes them.
-                    - Supporting characters must also have stable visual identities.
-                    - Never invent a new hairstyle, outfit color, accessory, body type, or age in later scenes.
-
-                    LANGUAGE
-                    - Use simple international English with concrete verbs and short natural phrasing.
-                    - Each narration must be exactly ONE natural spoken sentence.
-                    - Do not use semicolons or em dashes inside narration.
-                    - Avoid fancy literary wording, vague metaphors, abstract exposition, or inspirational speech.
-                    - Avoid words like reverie, tentative, poignant, destiny, fate, healing, fragile, etc.
-
-                    VISUAL-FIRST STORYTELLING
-                    - The story must still make sense if the viewer hears only half the narration.
-                    - Every scene should have a clear visible action, object interaction, spatial relationship, or visual consequence.
-                    - Prefer visual beats such as opening, grabbing, hiding, dropping, chasing, building, breaking, revealing, swapping, escaping, discovering, catching, choosing, or reacting.
-                    - Do not make a scene depend on a sentence explaining something that cannot be seen.
-
-                    VISUAL STYLE
-                    - Premium stylized 3D animated feature-film look, original and distinctive.
-                    - Modern, cinematic, polished, appealing to teens and adults; not preschool, not chibi, not photorealistic.
-                    - Strong silhouettes, attractive proportions, believable stylized anatomy, rich cinematic lighting, atmospheric depth, controlled color palette, expressive posing, and clear visual hierarchy.
-                    - Faces may be visible when useful; use expressive but natural animation-style faces, and keep facial features consistent across scenes.
-                    - Never imitate a specific studio, franchise, or copyrighted character design.
+                    IMPORTANT:
+                    - This is for an automated daily channel, so the result must feel like a REAL SHORT STORY, not a summary, essay, lesson, or list of events.
+                    - Start the narration in the middle of something happening: name the protagonist, show a concrete action, and reveal a problem or important stake immediately. Do NOT begin with generic atmosphere such as "the night was quiet", "the sun was setting", "Elena entered the room", or a description of a place unless something important is already happening.
+                    - The first spoken sentence must make the viewer ask a clear question such as "What happened?", "What will she do?", or "Why does this matter?" while remaining easy to understand.
+                    - Use simple everyday English that an international viewer can understand on the first listen.
+                    - Write like a narrator telling a true-to-life human story: specific people, specific actions, specific objects, clear cause and effect, and natural consequences.
+                    - Keep one main character, one meaningful relationship, one concrete goal, one real obstacle, one important choice, and one believable consequence.
+                    - Introduce the person's situation naturally through action instead of explaining their whole background.
+                    - Put the main problem on screen by Scene 1 or Scene 2, and make the stakes understandable without hidden context.
+                    - Every scene should answer or create a question that naturally leads to the next scene. Avoid disconnected scene summaries.
+                    - The emotional payoff should come from what the character does and what happens because of it, not from a speech about life.
+                    - Avoid generic motivational formulas, fake twists, vague inspirational language, and endings that sound like a quote poster.
+                    - Prefer fresh everyday conflicts over stock tropes such as mysterious notes, anonymous benefactors, dangerous lenders, secret fortunes, or convenient strangers.
+                    - Do not use fancy literary words, vague symbolism, confusing metaphors, or abstract language.
+                    - Prefer concrete verbs and visible actions such as grabs, hides, repairs, misses, searches, carries, refuses, chooses, returns, fixes, leaves, calls, gives, and keeps.
+                    - Avoid words like "reverie", "fragile", "tentative", "scars", "destiny", "fate", "healing", "poignant", or similar literary phrasing.
+                    - Each narration must be exactly ONE natural spoken sentence. Do not use semicolons, em dashes, or multiple sentence-ending punctuation marks inside one scene.
+                    - Prefer full names or names without titles; avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. inside narration when possible.
+                    - Every scene must be easy to create from one cinematic still image.
+                    - We will animate the still images with camera motion later.
+                    - The story should work for a broad international audience.
+                    - No facial expressions are needed; emotion must be shown through actions, hands, posture, objects, body orientation, and setting.
+                    - Vary the opening style from story to story; examples such as "Ellina was repairing...", "Sam was already late when...", or "Daniel found..." are style references only, not templates to repeat.
 
                     CREATIVE SEEDS
                     Domain: {random.choice(DOMAINS)}
                     Setting: {random.choice(SETTINGS)}
-                    Emotion/Tone: {random.choice(EMOTIONS)}
+                    Emotion: {random.choice(EMOTIONS)}
 
                     RECENT HISTORY
                     {recent_text}
@@ -551,87 +512,141 @@ jobs:
                     Return exactly this top-level JSON object:
 
                     {{
-                      "title": "short memorable title, 2-8 words",
-                      "hook": "10-24 word opening that creates immediate curiosity",
+                      "title": "short hooky title, 3-9 words",
+                      "hook": "10-20 word opening that creates immediate curiosity",
                       "description": "2-3 natural sentences for the YouTube description",
                       "protagonist": {{
-                        "name": "specific character name",
-                        "age": 16,
-                        "role": "specific role or situation with at least two words",
-                        "visual_identity": "stable appearance, clothing, colors, hairstyle, accessories and recognizable prop"
+                        "name": "specific adult name",
+                        "age": 21-70,
+                        "role": "specific adult role with at least two words",
+                        "visual_identity": "stable clothing/appearance description without showing the face"
                       }},
                       "setting": "specific physical setting",
                       "scenes": [
                         {{
                           "scene": 1,
-                          "narration": "10-32 spoken words",
-                          "visual_prompt": "high-detail cinematic 3D animation frame prompt with exact action, characters, environment, composition, lighting, camera, continuity and visual storytelling"
+                          "narration": "12-26 spoken words",
+                          "visual_prompt": "cinematic faceless still-image prompt; include subject, environment, action, lighting and camera framing"
                         }}
                       ]
                     }}
 
                     SCENE REQUIREMENTS
-                    - Use 7-16 scenes, choosing the count that naturally fits the story.
-                    - Target roughly 17-21 words per scene when practical, while respecting the hard 10-32 range and 105-230 total-word range.
-                    - Scene 1 is the strongest hook and must show the opening event directly.
-                    - Scene 2 deepens the problem or adds an immediate complication.
-                    - Scene 3 makes the goal, mystery, or stakes unmistakable.
-                    - Middle scenes escalate or reveal something new; do not merely describe travel or waiting.
-                    - At least one scene must contain a genuine surprise, reversal, clever reveal, or unexpected visual consequence.
-                    - Final scenes must pay off the opening setup in a satisfying way.
-                    - No filler scenes and no repetitive beats.
-
-                    IMAGE-PROMPT REQUIREMENTS FOR EVERY SCENE
-                    - Each visual_prompt must describe ONE frozen moment, not a sequence of multiple actions.
-                    - State exactly WHO is doing WHAT, WHERE they are, WHAT important object is involved, and WHAT just happened or is about to happen.
-                    - Specify camera framing and composition: close-up, medium shot, wide shot, over-the-shoulder, low angle, top-down, etc.
-                    - Keep the protagonist and supporting characters visually consistent with the character bible.
-                    - Do not invent extra people or replace the protagonist with another character.
-                    - The image must visually match the narration exactly; never show a different action from the spoken sentence.
-                    - Prefer dynamic composition, depth, foreground/background separation, strong silhouette, and one clear visual focal point.
-                    - Avoid scenes that are just "character standing in room" unless the standing pose itself is visually important.
+                    - Use 7-16 scenes, choosing the count that best fits the story. This is validated after generation.
+                    - Keep narration lengths natural for the chosen scene count: target roughly 17-21 words when practical, but shorten or lengthen individual scenes as needed so the complete story stays coherent and the hard 14-26 word range and 170-230 total-word range are satisfied.
+                    - Total narration should target 180-210 words; hard validation allows 170-230, and scene count should be chosen so this is achievable without filler or forced sentence lengths.
+                    - EVERY narration must be exactly ONE sentence.
+                    - Keep each sentence direct and conversational, suitable for voice-over.
+                    - Scenes must form one continuous causal story with no unexplained jumps.
+                    - Choose the scene count based on the story, not a fixed template: use fewer scenes for a tight story and more when a meaningful beat needs its own visual, within the 7-16 validated range.
+                    - Every scene must add new information, action, decision, consequence, or emotional change; never create filler scenes.
+                    - Scene 1 must name or clearly identify the protagonist, show a specific action, and reveal the immediate problem or stakes in the same sentence. It must feel like the beginning of a story, not the beginning of a location description.
+                    - Scene 2 should make the problem more concrete, and Scene 3 should make the main goal or difficult choice unmistakable.
+                    - Scene 2-3 establish the human problem in concrete terms.
+                    - Middle scenes show the choice and its immediate cost.
+                    - Final scenes show the real consequence and a believable emotional payoff.
+                    - No scene may depend on a facial expression.
+                    - Use hands, backs, silhouettes, clothing, props, environments, posture and actions.
 
                     STORY REQUIREMENTS
-                    - One clear protagonist.
-                    - No more than two important supporting characters.
-                    - One central goal, mystery, object, challenge, or question.
-                    - One active obstacle that escalates.
-                    - At least one surprise/reveal.
-                    - One meaningful choice with a consequence.
-                    - A satisfying final payoff connected to the opening.
-                    - No deus-ex-machina rescue, unexplained coincidence, sudden rich reward, or random stranger solving the story.
-                    - No graphic violence, sexual content, extreme fear, or disturbing imagery.
+                    - Adult protagonist.
+                    - One meaningful adult relationship.
+                    - Concrete goal stated or obvious from the first three scenes.
+                    - Real external obstacle that can be seen or understood immediately.
+                    - Two plausible options with different costs.
+                    - The chosen option creates a believable consequence that follows directly from the choice.
+                    - The ending changes the situation through a believable human consequence, not luck, magic, or an unexplained reward.
+                    - No preachy moral at the end.
+                    - The final narration should land naturally on what changed, not on a generic life lesson.
+                    - A viewer should be able to retell the story in 2-3 simple sentences after hearing it once.
 
-                    AVOID
-                    - Generic motivational speeches.
-                    - Generic office/workplace stories unless the premise is highly unusual.
-                    - Routine repair or shopping stories unless they contain a strong mystery, funny complication, or twist.
-                    - Hospital or terminal-illness plots.
-                    - Children in danger.
-                    - Lottery, hidden fortune, anonymous benefactor, surprise money.
-                    - Romance as the main engine.
-                    - Repeating the same setting, opening structure, object, or twist from RECENT HISTORY.
+                    BANNED:
+                    magic, supernatural, miracles, illness, hospitals, children in danger,
+                    benefactors, hidden fortunes, lottery, romance as the main engine,
+                    honesty-vs-lying, parent-vs-work, money-returning, elevator, blackout,
+                    concert, audition, train platform, coffee shop, ticking clock, glowing object,
+                    red ribbon, bonus, promotion, applause, thank-you note, random stranger,
+                    generic office puzzle, generic maintenance job, generic "believe in yourself"
+                    style motivational speech.
 
                     Do NOT mention these instructions in the JSON.
                     """
 
-              story = groq_json(
-                  prompt,
-                  max_tokens=2800,
-                  temperature=0.65,
-                  label="story-1",
-                        )
+              for call_number in range(1, MAX_STORY_CALLS + 1):
+                  story = groq_json(
+                      prompt,
+                      max_tokens=2200,
+                      temperature=0.65,
+                      label=f"story-{call_number}",
+                      response_schema=STORY_SCHEMA,
+                  )
 
-              # Local deterministic cleanup: remove punctuation-only fragmentation
-              # without consuming another Groq request.
-              for scene in story.get("scenes", []):
-                  scene["narration"] = normalize_one_sentence(scene.get("narration", ""))
+                  issue = validate_story(story)
+                  if not issue:
+                      return story
 
-              issue = validate_story(story)
-              if issue:
-                  raise RuntimeError(f"Generated story failed structural validation: {issue}")
+                  print(f"[validator] {issue}", flush=True)
 
-              return story
+                  repair_prompt = f"""
+                    Repair this story so it passes ALL deterministic requirements.
+
+                    CURRENT PROBLEM:
+                    {issue}
+
+                    IMPORTANT:
+                    Do not only fix the named problem.
+                    Re-check EVERY requirement before returning.
+                    Keep the same core premise and characters.
+                    Do not replace the story with a different generic story.
+
+                    Hard requirements:
+                    - top-level JSON OBJECT only
+                    - title
+                    - hook
+                    - description
+                    - protagonist object with fields: name, age, role, visual_identity
+                    - setting
+                    - between 7 and 16 scenes, choosing the count that fits the story
+                    - each scene has scene, narration, visual_prompt
+                    - narration lengths should be natural for the chosen scene count; target roughly 17-21 words when practical, with hard allowance 14-26 per scene
+                    - total narration should target 180-210 words; hard allowance 170-230, with natural variation in scene lengths when the chosen scene count requires it
+                    - scene count must remain within 7-16 and should match the natural pacing of the story
+                    - never add filler scenes solely to reach a target count
+                    - each narration must be exactly ONE simple sentence
+                    - avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. inside narration when possible
+                    - no semicolons, em dashes, multiple sentences, literary wording, or vague metaphors
+                    - use simple everyday English and concrete visible actions
+                    - protagonist role is at least 2 words
+                    - hook is 10-24 words
+                    - description is 20-90 words
+                    - all scenes are faceless-filmable
+                    - preserve the story's natural scene count; do not add filler scenes or delete meaningful scenes just to hit a number
+                    - no banned patterns
+
+                    STORY:
+                    {json.dumps(story, ensure_ascii=False)}
+
+                    Return ONLY the corrected JSON object.
+                    """
+
+                  story = groq_json(
+                      repair_prompt,
+                      max_tokens=2000,
+                      temperature=0.25,
+                      label=f"repair-{call_number}",
+                      response_schema=STORY_SCHEMA,
+                  )
+
+                  issue = validate_story(story)
+                  if not issue:
+                      return story
+
+                  print(f"[repair-validator] {issue}", flush=True)
+
+              raise RuntimeError(
+                  "The story could not pass deterministic validation "
+                  "after the allowed generation/repair calls."
+              )
 
           story = create_story()
 
@@ -681,7 +696,7 @@ jobs:
           # ============================================================
           # AI IMAGES: Pollinations authenticated API
           # Primary model: FLUX (Pollinations model id: flux)
-          # Stylized 3D animation frames are animated with FFmpeg camera motion.
+          # Still images are animated with FFmpeg camera motion.
           # ============================================================
 
           POLLINATIONS_KEY = os.environ.get("POLLINATIONS_API_KEY", "").strip()
@@ -759,27 +774,20 @@ jobs:
 
           for index, scene in enumerate(story["scenes"], 1):
               output = IMAGES / f"scene_{index:02d}.png"
-              protagonist = story["protagonist"]
               visual_anchor = (
-                  f"LOCKED CHARACTER BIBLE: {protagonist['name']}, age {protagonist['age']}, "
-                  f"role {protagonist['role']}, visual identity {protagonist['visual_identity']}. "
-                  "Preserve the exact same age, body build, hairstyle, hair color, skin tone, clothing colors, "
-                  "distinctive accessory and recognizable prop in every scene. "
+                  f"Character continuity: {story['protagonist']['name']}, age {story['protagonist']['age']}, "
+                  f"{story['protagonist']['role']}, {story['protagonist']['visual_identity']}. "
               )
               prompt = (
-                  "ONE FROZEN MOMENT ONLY. Match the narration and visual_prompt exactly. "
-                  + visual_anchor
-                  + "Scene action: " + scene["narration"] + " Visual direction: " + scene["visual_prompt"]
-                  + ". Premium original stylized 3D animated feature-film frame, vertical 9:16, "
-                    "dynamic cinematic composition, strong foreground-midground-background depth, clear focal point, "
-                    "appealing modern character design, coherent stylized anatomy, correct head-neck-spine alignment, "
-                    "natural hands and fingers, believable joints, correct limb count, physically coherent body orientation, "
-                    "consistent facial features when the face is visible, consistent clothing and accessories, "
-                    "expressive but natural pose, cinematic key light and rim light, atmospheric depth, polished materials, "
-                    "rich controlled color palette, no random extra characters, no character replacement, "
-                    "no duplicated objects, no twisted neck, no broken anatomy, no fused limbs, no extra fingers, "
-                    "no deformed hands, no impossible pose, no text, no captions, no logos, no watermark, "
-                    "not photorealistic, not preschool, not chibi"
+                  visual_anchor
+                  + scene["visual_prompt"]
+                  + ", vertical 9:16, cinematic photography, realistic materials, "
+                    "natural lighting, physically plausible human anatomy, correct head-neck-spine alignment, "
+                    "natural body proportions, natural hands and fingers, consistent clothing and character appearance, "
+                    "head and torso facing the same direction unless the action clearly requires otherwise, "
+                    "faceless composition with the face turned away, cropped, or naturally obscured, "
+                    "no distorted limbs, no twisted neck, no extra fingers, no duplicate body parts, "
+                    "no readable text in props, no watermark"
               )
 
               encoded = urllib.parse.quote(prompt, safe="")
@@ -976,13 +984,14 @@ jobs:
               str(silent_video),
           ], timeout=180)
 
-          # Final mux: keep the animation clean and do NOT burn captions into the video.
-          # captions.srt is still generated separately for timing/debugging and can be
-          # supplied to a platform later if needed.
+          # Burn captions and mux voice in one final pass.
           run_cmd([
               "ffmpeg", "-y",
               "-i", str(silent_video),
               "-i", str(OUT / "voice.mp3"),
+              "-vf", (
+                  f"ass={str((OUT / 'captions.ass').resolve())}"
+              ),
               "-map", "0:v:0",
               "-map", "1:a:0",
               "-c:v", "libx264",
@@ -1025,7 +1034,6 @@ jobs:
           print("Words:", words(script), flush=True)
           print("Voice:", voice, flush=True)
           print("Video:", final_video, flush=True)
-          print("Captions: captions.srt generated; not burned into video", flush=True)
           PY
 
       - name: Commit history
