@@ -369,27 +369,40 @@ jobs:
           def words(text):
               return len(str(text).split())
 
-          def is_one_sentence(text):
-              value = str(text).strip()
+          def normalize_narration(text):
+              """Keep a generated scene narration as one spoken TTS cue.
+
+              This is a local, deterministic cleanup only; it avoids spending
+              another Groq call when the model accidentally uses two short
+              sentences or a forbidden dash/semicolon.
+              """
+              value = re.sub(r"\s+", " ", str(text).strip())
               if not value:
-                  return False
-              if ";" in value or "—" in value or "–" in value:
-                  return False
-              if not re.search(r"[.!?](?:[\"\'\)\]])*$", value):
-                  return False
+                  return value
 
-              # Do not mistake normal abbreviations for sentence endings.
-              # Examples: Mr., Mrs., Ms., Dr., St., Prof., Sr., Jr., etc.
-              check = re.sub(
-                  r"\b(?:Mr|Mrs|Ms|Dr|St|Prof|Sr|Jr|vs|e\.g|i\.e)\.",
-                  lambda m: m.group(0).replace(".", "<DOT>"),
-                  value,
-                  flags=re.IGNORECASE,
-              )
+              parts = re.split(r"(?<=[.!?])\s+(?=[A-Z0-9\"'])", value)
+              if len(parts) > 1:
+                  cleaned = []
+                  for part in parts:
+                      part = part.strip().rstrip(".!?")
+                      if part:
+                          cleaned.append(part)
+                  value = ", and ".join(cleaned)
 
-              # A terminal punctuation mark may be followed by closing quotes or brackets.
-              check = re.sub(r"[.!?](?=[\"\'\)\]]*$)", "<END>", check)
-              return not bool(re.search(r"[.!?]\s+", check))
+              value = re.sub(r"\s*;\s*", ", and ", value)
+              value = re.sub(r"\s*[—–]\s*", ", and ", value)
+              value = re.sub(r"\s{2,}", " ", value).strip()
+
+              if value and value[-1] not in ".!?":
+                  value += "."
+              elif value:
+                  value = value[:-1] + "."
+              return value
+
+          def normalize_story_narrations(story):
+              for scene in story.get("scenes", []):
+                  if isinstance(scene, dict) and "narration" in scene:
+                      scene["narration"] = normalize_narration(scene["narration"])
 
           def validate_story(story):
               if not isinstance(story, dict):
@@ -511,6 +524,13 @@ jobs:
                     RECENT HISTORY
                     {recent_text}
 
+                    ORIGINALITY RULE:
+                    - Treat the recent history as a real anti-repetition list.
+                    - Do not reuse the same core conflict, central object, relationship dynamic,
+                      twist mechanism, setting, or ending pattern from a recent story.
+                    - Superficial changes to names or wording are not enough. The actual story
+                      situation and payoff must be materially different.
+
                     Return exactly this top-level JSON object:
 
                     {{
@@ -579,6 +599,7 @@ jobs:
                       response_schema=STORY_SCHEMA,
                   )
 
+                  normalize_story_narrations(story)
                   issue = validate_story(story)
                   if not issue:
                       return story
@@ -635,6 +656,7 @@ jobs:
                       response_schema=STORY_SCHEMA,
                   )
 
+                  normalize_story_narrations(story)
                   issue = validate_story(story)
                   if not issue:
                       return story
@@ -938,7 +960,7 @@ jobs:
               zoom_expr = (
                   "min(zoom+0.0008,1.12)"
                   if direction == 1
-                  else "max(zoom-0.0008,1.00)"
+                  else "if(eq(on,1),1.12,max(zoom-0.0008,1.00))"
               )
 
               vf = (
