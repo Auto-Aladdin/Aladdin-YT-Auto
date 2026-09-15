@@ -25,6 +25,7 @@ jobs:
       - name: Generate story, images, voice and video
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
         run: |
           set -euo pipefail
           python3 -u - <<'PY'
@@ -62,15 +63,16 @@ jobs:
           HISTORY_FILE = ROOT / ".github" / "data" / "story_history.json"
 
           API_KEY = os.environ["GROQ_API_KEY"]
+          POLLINATIONS_API_KEY = os.environ.get("POLLINATIONS_API_KEY", "").strip()
 
           MIN_WORDS = 170
           MAX_WORDS = 230
           SCENES_MIN = 10
           SCENES_MAX = 10
-          SCENE_MIN_WORDS = 16
-          SCENE_MAX_WORDS = 24
-          TARGET_SCENE_MIN_WORDS = 18
-          TARGET_SCENE_MAX_WORDS = 22
+          SCENE_MIN_WORDS = 14
+          SCENE_MAX_WORDS = 26
+          TARGET_SCENE_MIN_WORDS = 17
+          TARGET_SCENE_MAX_WORDS = 21
 
           HTTP_TIMEOUT = 45
           MAX_RETRIES = 2
@@ -416,8 +418,12 @@ jobs:
                   return f"Story is too long at {total} words; maximum {MAX_WORDS}."
 
               hook = str(story["hook"]).strip()
-              if words(hook) < 10:
-                  return "Hook is too short."
+              if words(hook) < 10 or words(hook) > 24:
+                  return "Hook must be 10-24 words."
+
+              description = str(story["description"]).strip()
+              if words(description) < 20 or words(description) > 90:
+                  return "Description must be 20-90 words."
 
               blob = json.dumps(story, ensure_ascii=False)
               bad = banned(blob)
@@ -476,13 +482,16 @@ jobs:
 
                     SCENE REQUIREMENTS
                     - Exactly 10 scenes.
-                    - Every narration must be 18-22 words.
-                    - Total narration must be 180-210 words.
+                    - Target 17-21 words per narration.
+                    - Hard limit: 14-26 words per narration.
+                    - Total narration target: 180-210 words; hard limit 170-230.
                     - Scenes must form one continuous causal story.
                     - Scene 1 must contain the hook moment visually.
                     - Scene 2-3 establish the human problem.
                     - Middle scenes escalate the choice.
-                    - Final scenes show a consequence and imperfect emotional payoff.
+                    - Scenes 4-7 escalate the dilemma through visible action and a real choice.
+                    - Scene 8 shows the decision or its immediate cost.
+                    - Scenes 9-10 show the consequence and an earned, imperfect emotional payoff.
                     - No scene may depend on a facial expression.
                     - Use hands, backs, silhouettes, clothing, props, environments, posture and actions.
 
@@ -545,7 +554,7 @@ jobs:
                     - setting
                     - exactly 10 scenes
                     - each scene has scene, narration, visual_prompt
-                    - each narration should target 18-22 words; hard allowance 16-24
+                    - each narration should target 17-21 words; hard allowance 14-26
                     - total narration should target 180-210 words; hard allowance 170-230
                     - protagonist role is at least 2 words
                     - hook is 10-24 words
@@ -636,10 +645,19 @@ jobs:
               last_error = None
               for attempt in range(1, 4):
                   try:
-                      req = urllib.request.Request(
-                          url,
-                          headers={"User-Agent": "Aladdin-YT-Auto/ShortsFactory-V1", "Accept": "image/*"},
-                      )
+                      headers = {
+                          "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V2",
+                          "Accept": "image/*",
+                      }
+                      if POLLINATIONS_API_KEY:
+                          headers["Authorization"] = f"Bearer {POLLINATIONS_API_KEY}"
+                      else:
+                          raise RuntimeError(
+                              "POLLINATIONS_API_KEY is not configured. "
+                              "Current Pollinations image generation requires an API key."
+                          )
+
+                      req = urllib.request.Request(url, headers=headers)
                       with urllib.request.urlopen(req, timeout=timeout) as r:
                           data = r.read()
                           content_type = (r.headers.get("Content-Type") or "").lower()
@@ -672,28 +690,13 @@ jobs:
 
               encoded = urllib.parse.quote(prompt, safe="")
               url = (
-                  "https://image.pollinations.ai/prompt/"
+                  "https://gen.pollinations.ai/image/"
                   + encoded
-                  + f"?width={IMAGE_WIDTH}&height={IMAGE_HEIGHT}"
-                  + "&nologo=true"
+                  + f"?model=flux&width={IMAGE_WIDTH}&height={IMAGE_HEIGHT}"
               )
 
               print(f"[image] scene {index}: generating", flush=True)
-
-              try:
-                  download(url, output)
-              except Exception as exc:
-                  print(
-                      f"[image] primary endpoint failed for scene {index}: {exc}",
-                      flush=True,
-                  )
-                  # Current Pollinations deployments may require the newer host.
-                  url2 = (
-                      "https://gen.pollinations.ai/image/"
-                      + encoded
-                      + f"?model=flux&width={IMAGE_WIDTH}&height={IMAGE_HEIGHT}"
-                  )
-                  download(url2, output)
+              download(url, output)
 
           # ============================================================
           # CREATE MOTION CLIPS
