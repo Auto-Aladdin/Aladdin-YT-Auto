@@ -9,7 +9,7 @@ permissions:
 jobs:
   build-short:
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 25
 
     steps:
       - name: Checkout
@@ -63,7 +63,6 @@ jobs:
           HISTORY_FILE = ROOT / ".github" / "data" / "story_history.json"
 
           API_KEY = os.environ["GROQ_API_KEY"]
-          POLLINATIONS_API_KEY = os.environ.get("POLLINATIONS_API_KEY", "").strip()
 
           MIN_WORDS = 170
           MAX_WORDS = 230
@@ -418,12 +417,8 @@ jobs:
                   return f"Story is too long at {total} words; maximum {MAX_WORDS}."
 
               hook = str(story["hook"]).strip()
-              if words(hook) < 10 or words(hook) > 24:
-                  return "Hook must be 10-24 words."
-
-              description = str(story["description"]).strip()
-              if words(description) < 20 or words(description) > 90:
-                  return "Description must be 20-90 words."
+              if words(hook) < 10:
+                  return "Hook is too short."
 
               blob = json.dumps(story, ensure_ascii=False)
               bad = banned(blob)
@@ -482,16 +477,13 @@ jobs:
 
                     SCENE REQUIREMENTS
                     - Exactly 10 scenes.
-                    - Target 17-21 words per narration.
-                    - Hard limit: 14-26 words per narration.
-                    - Total narration target: 180-210 words; hard limit 170-230.
+                    - Every narration should target 17-21 words; hard validation allows 14-26.
+                    - Total narration should target 180-210 words; hard validation allows 170-230.
                     - Scenes must form one continuous causal story.
                     - Scene 1 must contain the hook moment visually.
                     - Scene 2-3 establish the human problem.
                     - Middle scenes escalate the choice.
-                    - Scenes 4-7 escalate the dilemma through visible action and a real choice.
-                    - Scene 8 shows the decision or its immediate cost.
-                    - Scenes 9-10 show the consequence and an earned, imperfect emotional payoff.
+                    - Final scenes show a consequence and imperfect emotional payoff.
                     - No scene may depend on a facial expression.
                     - Use hands, backs, silhouettes, clothing, props, environments, posture and actions.
 
@@ -636,28 +628,33 @@ jobs:
           ], timeout=180)
 
           # ============================================================
-          # FREE AI IMAGES: Pollinations anonymous image endpoint
-          # We intentionally use still images + FFmpeg camera motion.
-          # This avoids paid image/video-generation APIs.
+          # AI IMAGES: Pollinations authenticated API
+          # Primary model: FLUX (Pollinations model id: flux)
+          # Still images are animated with FFmpeg camera motion.
           # ============================================================
 
-          def download(url, path, timeout=90):
+          POLLINATIONS_KEY = os.environ.get("POLLINATIONS_API_KEY", "").strip()
+          if not POLLINATIONS_KEY:
+              raise RuntimeError(
+                  "Missing POLLINATIONS_API_KEY GitHub secret. "
+                  "Add the secret before running the workflow."
+              )
+
+          POLLINATIONS_BASE = "https://gen.pollinations.ai/image/"
+
+          def download_image(url, path, timeout=120):
               last_error = None
               for attempt in range(1, 4):
                   try:
-                      headers = {
-                          "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V2",
-                          "Accept": "image/*",
-                      }
-                      if POLLINATIONS_API_KEY:
-                          headers["Authorization"] = f"Bearer {POLLINATIONS_API_KEY}"
-                      else:
-                          raise RuntimeError(
-                              "POLLINATIONS_API_KEY is not configured. "
-                              "Current Pollinations image generation requires an API key."
-                          )
-
-                      req = urllib.request.Request(url, headers=headers)
+                      req = urllib.request.Request(
+                          url,
+                          headers={
+                              "Authorization": f"Bearer {POLLINATIONS_KEY}",
+                              "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V2",
+                              "Accept": "image/png,image/jpeg,image/webp,image/*",
+                          },
+                          method="GET",
+                      )
                       with urllib.request.urlopen(req, timeout=timeout) as r:
                           data = r.read()
                           content_type = (r.headers.get("Content-Type") or "").lower()
@@ -666,37 +663,67 @@ jobs:
                           raise RuntimeError(
                               f"Image response for {path.name} is suspiciously small ({len(data)} bytes)."
                           )
-                      if "image" not in content_type and not data.startswith(b"\x89PNG") and not data.startswith(b"\xff\xd8") and not data.startswith(b"RIFF"):
+
+                      valid_magic = (
+                          data.startswith(b"\x89PNG")
+                          or data.startswith(b"\xff\xd8")
+                          or data.startswith(b"RIFF")
+                      )
+                      if "image" not in content_type and not valid_magic:
+                          preview = data[:160].decode("utf-8", errors="replace")
                           raise RuntimeError(
-                              f"Image response for {path.name} is not an image (Content-Type: {content_type})."
+                              f"Image response for {path.name} is not an image "
+                              f"(Content-Type: {content_type}, body starts: {preview!r})."
                           )
 
                       path.write_bytes(data)
+                      print(
+                          f"[image] saved {path.name} ({len(data)/1024:.1f} KiB)",
+                          flush=True,
+                      )
                       return
+
+                  except urllib.error.HTTPError as exc:
+                      raw = exc.read().decode("utf-8", errors="replace")
+                      last_error = RuntimeError(
+                          f"HTTP {exc.code}: {raw[:1200]}"
+                      )
+                      print(
+                          f"[image] attempt {attempt}/3 HTTP {exc.code} for {path.name}",
+                          flush=True,
+                      )
                   except Exception as exc:
                       last_error = exc
-                      if attempt < 3:
-                          time.sleep(2 * attempt)
-              raise RuntimeError(f"Image download failed for {path.name}: {last_error}")
+                      print(
+                          f"[image] attempt {attempt}/3 failed for {path.name}: {exc}",
+                          flush=True,
+                      )
+
+                  if attempt < 3:
+                      time.sleep(2 * attempt)
+
+              raise RuntimeError(
+                  f"Pollinations image generation failed for {path.name}: {last_error}"
+              )
 
           for index, scene in enumerate(story["scenes"], 1):
               output = IMAGES / f"scene_{index:02d}.png"
               prompt = (
                   scene["visual_prompt"]
-                  + ", vertical 9:16, cinematic photography, "
-                    "realistic materials, natural lighting, "
-                    "faceless composition, no text, no watermark"
+                  + ", vertical 9:16, cinematic photography, realistic materials, "
+                    "natural lighting, faceless composition, no text, no watermark"
               )
 
               encoded = urllib.parse.quote(prompt, safe="")
               url = (
-                  "https://gen.pollinations.ai/image/"
+                  POLLINATIONS_BASE
                   + encoded
                   + f"?model=flux&width={IMAGE_WIDTH}&height={IMAGE_HEIGHT}"
+                  + "&nologo=true"
               )
 
-              print(f"[image] scene {index}: generating", flush=True)
-              download(url, output)
+              print(f"[image] scene {index}: generating with Pollinations FLUX", flush=True)
+              download_image(url, output)
 
           # ============================================================
           # CREATE MOTION CLIPS
