@@ -65,14 +65,16 @@ jobs:
 
           MIN_WORDS = 170
           MAX_WORDS = 230
-          SCENES_MIN = 9
+          SCENES_MIN = 10
           SCENES_MAX = 10
-          SCENE_MIN_WORDS = 18
-          SCENE_MAX_WORDS = 22
+          SCENE_MIN_WORDS = 16
+          SCENE_MAX_WORDS = 24
+          TARGET_SCENE_MIN_WORDS = 18
+          TARGET_SCENE_MAX_WORDS = 22
 
           HTTP_TIMEOUT = 45
           MAX_RETRIES = 2
-          MAX_STORY_CALLS = 2
+          MAX_STORY_CALLS = 1
           MIN_GAP = 1.0
 
           IMAGE_WIDTH = 768
@@ -186,7 +188,48 @@ jobs:
 
           last_call = 0.0
 
-          def groq_json(prompt, max_tokens=2400, temperature=0.55, label="groq"):
+          STORY_SCHEMA = {
+              "name": "publication_story",
+              "schema": {
+                  "type": "object",
+                  "properties": {
+                      "title": {"type": "string"},
+                      "hook": {"type": "string"},
+                      "description": {"type": "string"},
+                      "protagonist": {
+                          "type": "object",
+                          "properties": {
+                              "name": {"type": "string"},
+                              "age": {"type": "integer"},
+                              "role": {"type": "string"},
+                              "visual_identity": {"type": "string"}
+                          },
+                          "required": ["name", "age", "role", "visual_identity"],
+                          "additionalProperties": False
+                      },
+                      "setting": {"type": "string"},
+                      "scenes": {
+                          "type": "array",
+                          "minItems": 10,
+                          "maxItems": 10,
+                          "items": {
+                              "type": "object",
+                              "properties": {
+                                  "scene": {"type": "integer"},
+                                  "narration": {"type": "string"},
+                                  "visual_prompt": {"type": "string"}
+                              },
+                              "required": ["scene", "narration", "visual_prompt"],
+                              "additionalProperties": False
+                          }
+                      }
+                  },
+                  "required": ["title", "hook", "description", "protagonist", "setting", "scenes"],
+                  "additionalProperties": False
+              }
+          }
+
+          def groq_json(prompt, max_tokens=2000, temperature=0.55, label="groq", response_schema=None):
               global last_call
 
               gap = time.monotonic() - last_call
@@ -210,7 +253,18 @@ jobs:
                   "include_reasoning": False,
                   "temperature": temperature,
                   "max_completion_tokens": max_tokens,
-                  "response_format": {"type": "json_object"},
+                  "response_format": (
+                      {
+                          "type": "json_schema",
+                          "json_schema": {
+                              "name": response_schema["name"],
+                              "strict": True,
+                              "schema": response_schema["schema"],
+                          },
+                      }
+                      if response_schema
+                      else {"type": "json_object"}
+                  ),
               }
 
               for attempt in range(1, MAX_RETRIES + 1):
@@ -458,9 +512,10 @@ jobs:
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
                       prompt,
-                      max_tokens=2500,
+                      max_tokens=2000,
                       temperature=0.65,
                       label=f"story-{call_number}",
+                      response_schema=STORY_SCHEMA,
                   )
 
                   issue = validate_story(story)
@@ -490,8 +545,8 @@ jobs:
                     - setting
                     - exactly 10 scenes
                     - each scene has scene, narration, visual_prompt
-                    - each narration 18-22 words
-                    - total narration 180-210 words
+                    - each narration should target 18-22 words; hard allowance 16-24
+                    - total narration should target 180-210 words; hard allowance 170-230
                     - protagonist role is at least 2 words
                     - hook is 10-24 words
                     - description is 20-90 words
@@ -507,9 +562,10 @@ jobs:
 
                   story = groq_json(
                       repair_prompt,
-                      max_tokens=2300,
+                      max_tokens=1700,
                       temperature=0.25,
                       label=f"repair-{call_number}",
+                      response_schema=STORY_SCHEMA,
                   )
 
                   issue = validate_story(story)
