@@ -43,15 +43,15 @@ jobs:
           MIN_DURATION = 45
           MAX_DURATION = 180
 
-          # Keep the entire run small enough to avoid self-inflicted 429s.
-          # Normal path: 4 API calls.
-          # 1) architect/story draft
-          # 2) critic
-          # 3) repair/polish if needed
-          # 4) final critic
-          MAX_API_CALLS = 7
-          MAX_REPAIR_ROUNDS = 2
-          MIN_SECONDS_BETWEEN_CALLS = 3.0
+          # Keep the run deliberately small for the documented 8K TPM ceiling.
+          # Maximum normal path: 4 calls across 2 independent story candidates.
+          # 1) story candidate A
+          # 2) critic A
+          # 3) fresh story candidate B
+          # 4) critic B
+          MAX_API_CALLS = 4
+          MAX_STORY_ATTEMPTS = 2
+          MIN_SECONDS_BETWEEN_CALLS = 20.0
 
           API_KEY = os.environ["GROQ_API_KEY"]
           rng = random.SystemRandom()
@@ -248,23 +248,48 @@ jobs:
 
           # Keep history compact. Only high-level premise information is useful
           # for novelty checking; do not resend entire old stories to Groq.
-          recent = history[-25:]
+          recent = history[-12:]
           recent_text = "\n".join(
-              f"- {item.get('title', '')} | {item.get('premise', '')} | {item.get('setting', '')}"
+              f"- {str(item.get('title', ''))[:100]} | "
+              f"{str(item.get('premise', ''))[:220]} | "
+              f"{str(item.get('setting', ''))[:100]}"
               for item in recent
           ) or "NONE"
 
           api_calls = 0
           last_call_started = 0.0
 
-          def _header_float(headers, name, default):
-              value = headers.get(name)
-              if not value:
+          def _parse_duration(value, default=10.0):
+              if value is None:
                   return default
+              text = str(value).strip().lower()
               try:
-                  return float(str(value).strip().rstrip('s'))
+                  if text.endswith("ms"):
+                      return float(text[:-2]) / 1000.0
+                  if text.endswith("s") and "m" not in text:
+                      return float(text[:-1])
+              except Exception:
+                  pass
+              total = 0.0
+              matched = False
+              import re
+              minute = re.search(r"(\d+(?:\.\d+)?)m", text)
+              second = re.search(r"(\d+(?:\.\d+)?)s", text)
+              if minute:
+                  total += float(minute.group(1)) * 60.0
+                  matched = True
+              if second:
+                  total += float(second.group(1))
+                  matched = True
+              if matched:
+                  return total
+              try:
+                  return float(text)
               except Exception:
                   return default
+
+          def _header_float(headers, name, default):
+              return _parse_duration(headers.get(name), default)
 
           def call_groq(prompt, schema, temperature=0.6, max_tokens=4200):
               global api_calls, last_call_started
@@ -526,6 +551,60 @@ jobs:
           Return ONLY the final story JSON.
           """
 
+          def make_fresh_story_prompt(rejected_story, critique, attempt_number):
+              return f"""
+          Create a COMPLETELY NEW original emotional micro-story for a faceless
+          vertical YouTube Short. This is replacement attempt {attempt_number}.
+
+          A previous story was rejected. DO NOT repair it and DO NOT reuse its
+          premise, central object, setting, relationship, conflict, hook, reveal,
+          or ending structure. Start from a different real-world situation.
+
+          REJECTED STORY SUMMARY:
+          {json.dumps({
+              'title': rejected_story.get('title', ''),
+              'setting': rejected_story.get('setting', ''),
+              'description': rejected_story.get('description', ''),
+              'conflict': rejected_story.get('conflict', ''),
+              'turning_point': rejected_story.get('turning_point', ''),
+              'payoff': rejected_story.get('payoff', ''),
+          }, ensure_ascii=False)}
+
+          WHY IT FAILED:
+          {json.dumps(critique.get('issues', []), ensure_ascii=False)}
+
+          RECENT CHANNEL HISTORY:
+          {recent_text}
+
+          HARD REQUIREMENTS:
+          - Build a new premise, not a repaired version of the rejected one.
+          - Use a believable ordinary human situation with a specific protagonist.
+          - Give the protagonist a concrete goal that matters today.
+          - Use a real external obstacle and a meaningful choice with a real cost.
+          - The turning point must come from something established earlier.
+          - The ending must resolve the central problem without a miracle, secret
+            benefactor, magical object, hidden fortune, random coincidence, or sudden
+            forgiveness.
+          - Do not use race-against-the-clock mail delivery, jammed doors/slots,
+            keys unlocking hidden things, school deadlines, florist/orchid symbolism,
+            love letters, recipes, photographs, kites, violinists, child rescue,
+            hospital reveals, illness reveals, lottery wins, or promotion/license
+            punishment as the central engine.
+          - Do not introduce fantasy, time loops, puzzles, secret codes, supernatural
+            behavior, or implausible institutional rules merely to increase originality.
+          - Prefer a grounded professional, family, neighbor, customer, craft, or
+            responsibility conflict where both sides have understandable motives.
+          - Change at least FOUR of these from the rejected story: setting, object,
+            profession, relationship, immediate goal, source of conflict, and visual motif.
+          - Faceless filming must work naturally.
+          - Target 140-300 spoken words, 7-12 scenes. Absolute range 105-405.
+          - The first scene must begin with a specific action/problem that raises an
+            unanswered question immediately.
+          - Let emotion come from consequences, not speeches.
+
+          Return ONLY the new story JSON.
+          """
+
           def make_critic_prompt(story):
               return f"""
           Ruthlessly review the following proposed YouTube Short as a professional
@@ -567,291 +646,96 @@ jobs:
           Return ONLY critic JSON.
           """
 
-          def make_repair_prompt(story, critique, local_issue=None):
-              issue_text = list(critique.get("issues", []))
-              if local_issue:
-                  issue_text.append(local_issue)
-
-              repair_directive = (
-                  "Repair the structure while preserving only genuinely strong elements. "
-                  "Treat the critic's examples as diagnosis only, never as instructions for fantasy, "
-                  "puzzles, supernatural devices, or implausible mechanisms."
-                  if local_issue is None
-                  else "The hard validator found a structural flaw. Replace the offending mechanism completely. "
-                       "Hard realism rules override every critic suggestion; do not implement speculative "
-                       "examples such as time-locks, hidden codes, magical behavior, impossible exits, "
-                       "or artificial professional penalties."
-              )
-
-              return f"""
-          Completely rewrite the following story into a stronger publication-ready
-          short film. Do not merely polish sentences. Fix the underlying structure.
-
-          ORIGINAL STORY:
-          {json.dumps(story, ensure_ascii=False)}
-
-          CRITIC ISSUES:
-          {json.dumps(issue_text, ensure_ascii=False)}
-
-          REPAIR DIRECTIVE:
-          {repair_directive}
-
-          REQUIREMENTS:
-          - Keep only elements that are genuinely strong.
-          - If major critic scores remain below 7, replace the underlying premise rather
-            than defending it. Do not merely rewrite dialogue or add sentimental language.
-          - Strengthen the protagonist's specific identity and concrete goal.
-          - Make the obstacle external and consequential.
-          - Give the protagonist a real choice between two costly options.
-          - Make the cost personal and believable.
-          - Add logical escalation.
-          - Make the turning point depend on an earlier setup detail.
-          - Make the resolution change the meaning of the opening.
-          - Replace generic objects/motifs with one distinctive visual element.
-          - No random stranger, miracle, hidden fortune, illness reveal, child rescue,
-            love-letter trope, recipe trope, photograph trope, or pasted-on moral.
-          - No philosophical speech.
-          - 140-300 words preferred; absolute range 105-405.
-          - 7-12 scenes preferred; absolute range 7-18.
-          - Faceless-friendly visuals.
-
-          Return ONLY corrected story JSON.
-          """
-
           # ============================================================
-          # CALL 1: MASTER STORY GENERATION
+          # BOUNDED STORY SEARCH
           # ============================================================
 
-          print("=" * 60)
-          print("MASTER STORY GENERATION")
-          print("=" * 60)
+          # The critical fix: once a premise fails quality review, do NOT keep
+          # repairing the same premise. Generate a genuinely different story.
+          # This prevents the repeated-mail/key/slot style failures seen in
+          # previous runs and uses far fewer tokens than repeated rewrites.
 
-          story = call_groq(
-              make_master_prompt(),
-              STORY_SCHEMA,
-              temperature=0.72,
-              max_tokens=4200,
-          )
+          story = None
+          quality_report = None
+          last_critique = None
 
-          local_issue = local_story_check(story)
-
-          # A short draft is not a failure. Give the repair stage the exact
-          # length problem instead of consuming another generation attempt.
-          if local_issue:
-              print("INITIAL STORY CHECK:", local_issue)
-
-          # ============================================================
-          # CALL 2: CRITIQUE
-          # ============================================================
-
-          print("=" * 60)
-          print("QUALITY REVIEW")
-          print("=" * 60)
-
-          critique = call_groq(
-              make_critic_prompt(story),
-              CRITIC_SCHEMA,
-              temperature=0.10,
-              max_tokens=2200,
-          )
-
-          print(json.dumps(critique, ensure_ascii=False, indent=2))
-
-          # ============================================================
-          # CALLS 3+: BOUNDED STRUCTURAL REPAIR
-          # ============================================================
-
-          # The first critic is used as the repair diagnosis. We do not spend
-          # another API call critiquing every intermediate repair. This keeps
-          # the pipeline stable under Groq rate limits while preserving a
-          # mandatory independent final publication critic below.
-          quality_report = critique
-          repair_rounds_used = 0
-
-          while repair_rounds_used < MAX_REPAIR_ROUNDS:
-              local_issue = local_story_check(story)
-
-              if not local_issue and quality_report.get("pass"):
-                  break
-
-              if api_calls >= MAX_API_CALLS:
-                  break
-
-              repair_rounds_used += 1
-
+          for attempt_number in range(1, MAX_STORY_ATTEMPTS + 1):
               print("=" * 60)
-              print(
-                  f"STRUCTURAL REPAIR ROUND "
-                  f"{repair_rounds_used}/{MAX_REPAIR_ROUNDS}"
-              )
+              print(f"STORY CANDIDATE {attempt_number}/{MAX_STORY_ATTEMPTS}")
               print("=" * 60)
 
-              story = call_groq(
-                  make_repair_prompt(
+              if attempt_number == 1:
+                  prompt = make_master_prompt()
+                  temperature = 0.68
+              else:
+                  prompt = make_fresh_story_prompt(
                       story,
-                      quality_report,
-                      local_issue,
-                  ),
-                  STORY_SCHEMA,
-                  temperature=(
-                      0.50 if repair_rounds_used == 1 else 0.42
-                  ),
-                  max_tokens=4500,
-              )
-
-              local_issue = local_story_check(story)
-
-              if local_issue:
-                  print("REPAIR LOCAL CHECK:", local_issue)
-
-                  # One emergency clean-repair is available only when there
-                  # is still room for the mandatory final critic call.
-                  if api_calls + 1 < MAX_API_CALLS:
-                      print(
-                          "RUNNING EMERGENCY CLEAN REPAIR AFTER LOCAL REJECTION"
-                      )
-
-                      story = call_groq(
-                          make_repair_prompt(
-                              story,
-                              {
-                                  "pass": False,
-                                  "issues": [
-                                      "HARD LOCAL REJECTION: " + local_issue,
-                                      "Do not repeat or disguise the rejected mechanism.",
-                                      "Use a completely ordinary real-world mechanism instead.",
-                                  ],
-                              },
-                              local_issue,
-                          ),
-                          STORY_SCHEMA,
-                          temperature=0.32,
-                          max_tokens=4500,
-                      )
-
-                      local_issue = local_story_check(story)
-
-                      if local_issue:
-                          print(
-                              "EMERGENCY REPAIR LOCAL CHECK:",
-                              local_issue,
-                          )
-                          quality_report = {
-                              "pass": False,
-                              "issues": [local_issue],
-                          }
-                          continue
-
-                      print("EMERGENCY REPAIR PASSED LOCAL CHECK")
-
-                  if local_issue:
-                      quality_report = {
-                          "pass": False,
-                          "issues": [local_issue],
-                      }
-                      continue
-
-              # The current story is locally safe. The original critic's
-              # issues remain the repair guidance until the independent final
-              # critic decides publication readiness.
-              print("REPAIR PASSED LOCAL CHECK")
-
-          # ============================================================
-          # FINAL INDEPENDENT PUBLICATION CRITIC
-          # ============================================================
-
-          if api_calls >= MAX_API_CALLS:
-              raise RuntimeError(
-                  "Groq API call budget was exhausted before the final "
-                  "independent publication review."
-              )
-
-          print("=" * 60)
-          print("FINAL INDEPENDENT PUBLICATION REVIEW")
-          print("=" * 60)
-
-          final_quality_report = call_groq(
-              make_critic_prompt(story),
-              CRITIC_SCHEMA,
-              temperature=0.10,
-              max_tokens=2200,
-          )
-
-          print(
-              json.dumps(
-                  final_quality_report,
-                  ensure_ascii=False,
-                  indent=2,
-              )
-          )
-
-          quality_report = final_quality_report
-
-          # One last complete repair is allowed only when the independent
-          # final critic rejects the story and there is enough API budget for
-          # both the repair and one replacement final critic.
-          if (
-              not quality_report.get("pass")
-              and api_calls + 1 < MAX_API_CALLS
-          ):
-              print("=" * 60)
-              print("FINAL CRITIC REJECTED STORY — RUNNING LAST REPAIR")
-              print("=" * 60)
-
-              story = call_groq(
-                  make_repair_prompt(
-                      story,
-                      quality_report,
-                      None,
-                  ),
-                  STORY_SCHEMA,
-                  temperature=0.38,
-                  max_tokens=4500,
-              )
-
-              final_local_issue = local_story_check(story)
-
-              if final_local_issue:
-                  raise RuntimeError(
-                      "Last repair failed hard local validation: "
-                      + final_local_issue
+                      last_critique or {"issues": []},
+                      attempt_number,
                   )
+                  temperature = 0.72
+
+              candidate = call_groq(
+                  prompt,
+                  STORY_SCHEMA,
+                  temperature=temperature,
+                  max_tokens=2600,
+              )
+
+              local_issue = local_story_check(candidate)
+              if local_issue:
+                  print("CANDIDATE LOCAL CHECK:", local_issue)
+                  story = candidate
+                  last_critique = {"pass": False, "issues": [local_issue]}
+                  continue
 
               print("=" * 60)
-              print("FINAL REVIEW AFTER LAST REPAIR")
+              print(f"QUALITY REVIEW FOR CANDIDATE {attempt_number}")
               print("=" * 60)
 
-              quality_report = call_groq(
-                  make_critic_prompt(story),
+              critique = call_groq(
+                  make_critic_prompt(candidate),
                   CRITIC_SCHEMA,
                   temperature=0.10,
-                  max_tokens=2200,
+                  max_tokens=1100,
               )
 
-              print(
-                  json.dumps(
-                      quality_report,
-                      ensure_ascii=False,
-                      indent=2,
-                  )
-              )
+              print(json.dumps(critique, ensure_ascii=False, indent=2))
 
-          # NEVER bypass an independent quality rejection with local validation.
-          # A story may be published only when the latest independent critic
-          # explicitly passes it.
+              story = candidate
+              last_critique = critique
+              quality_report = critique
+
+              if critique.get("pass"):
+                  print("CANDIDATE PASSED QUALITY REVIEW")
+                  break
+
+              print("CANDIDATE REJECTED — GENERATING A FRESH PREMISE")
+
+              if attempt_number < MAX_STORY_ATTEMPTS:
+                  time.sleep(2)
+
+          if story is None or quality_report is None:
+              raise RuntimeError("No story candidate was generated.")
+
+          # ============================================================
+          # FINAL PUBLICATION DECISION
+          # ============================================================
+
           final_local_issue = local_story_check(story)
-
           if final_local_issue:
               raise RuntimeError(
-                  "Story could not be made publication-safe: "
+                  "Final candidate failed hard local validation: "
                   + final_local_issue
               )
 
+          # A failed candidate can NEVER be published merely because local
+          # validation passed. Only an explicit independent critic pass is valid.
           if not quality_report.get("pass"):
               raise RuntimeError(
-                  "Story failed the publication quality gate. "
-                  "The independent final critic did not approve the final story. "
-                  "Issues: "
+                  "No publication-ready story was produced after "
+                  f"{MAX_STORY_ATTEMPTS} independent story candidates. "
+                  "Last critic issues: "
                   + json.dumps(
                       quality_report.get("issues", []),
                       ensure_ascii=False,
