@@ -90,40 +90,54 @@ jobs:
           # ------------------------------------------------------------
 
           DOMAINS = [
-              "quiet personal responsibility",
-              "adult sibling relationship",
-              "mentor and former apprentice",
-              "neighbor helping neighbor",
-              "small business relationship",
-              "customer and specialist",
-              "community responsibility",
-              "friendship after a long misunderstanding",
-              "adult family obligation",
-              "ordinary person making a difficult choice",
+              "unexpected mistake with escalating consequences",
+              "clever rivalry between two determined people",
+              "friendship tested by a surprising misunderstanding",
+              "ordinary task that turns into an unusual challenge",
+              "strange discovery that creates a practical problem",
+              "competition where the obvious strategy fails",
+              "small act that triggers an unexpected chain reaction",
+              "missing object with a revealing search",
+              "time-pressure decision with two believable choices",
+              "failed plan that forces a smarter second attempt",
+              "awkward public situation that becomes unexpectedly funny",
+              "teamwork problem where people must improvise",
+              "rivalry that reveals unexpected respect",
+              "ordinary person protecting something important without superpowers",
+              "misunderstanding that changes completely after one discovery",
           ]
 
           SETTINGS = [
-              "small repair shop",
-              "quiet neighborhood office",
-              "local library workroom",
-              "modest bakery before opening",
-              "small tailoring studio",
-              "community hall",
-              "neighborhood bookstore",
-              "shared workshop",
-              "small photography studio",
-              "local market back room",
+              "busy repair workshop",
+              "crowded apartment building",
+              "small neighborhood market",
+              "community sports facility",
+              "compact design studio",
+              "school-adjacent community space with adults present",
+              "city rooftop workspace",
+              "old theater backstage area",
+              "weekend street market",
+              "train-station service area",
+              "small restaurant kitchen before opening",
+              "delivery depot",
+              "photography studio",
+              "maker workshop",
+              "apartment hallway and storage room",
           ]
 
           EMOTIONS = [
-              "quiet determination",
-              "earned respect",
-              "bittersweet relief",
-              "acceptance",
-              "belonging",
-              "forgiveness",
-              "quiet pride",
+              "curiosity",
+              "tension",
               "surprise",
+              "humor",
+              "relief",
+              "determination",
+              "awkwardness",
+              "wonder without magic",
+              "earned respect",
+              "warmth",
+              "triumph",
+              "quiet emotional payoff",
           ]
 
           BANNED = [
@@ -488,107 +502,133 @@ jobs:
 
           def create_story():
               prompt = f"""
-                    Create ONE original faceless YouTube Short package.
+                    You are the lead writer and story editor for a premium global animated-Shorts studio.
+                    Create ONE original short animated film package. Think like a professional screenwriter,
+                    story editor, storyboard director, and retention-focused Shorts creator working together.
 
-                    IMPORTANT:
-                    - Create a short animated entertainment film, NOT a motivational speech, workplace anecdote, essay, or list of events.
-                    - The story must be instantly understandable and enjoyable even for a viewer who is only half-listening to the words. Every scene must communicate something visually.
-                    - Open inside the action. In the first sentence, introduce the protagonist by name, show a specific visible action, and reveal an unusual problem, challenge, secret, mistake, or goal that makes the viewer wonder what happens next.
-                    - Do NOT begin with generic weather, scenery, backstory, or slow introductions. The opening should feel like the first shot of a movie already in progress.
-                    - Build around one simple curiosity question that keeps pulling the viewer forward until the payoff.
-                    - Use a clean story spine: HOOK -> GOAL -> OBSTACLE -> ESCALATION -> CHOICE -> CONSEQUENCE -> SURPRISE OR EMOTIONAL PAYOFF.
-                    - Every 1-2 scenes, something must change: a new problem appears, a plan fails, a discovery changes the goal, a risk increases, or a funny/clever complication happens.
-                    - Prefer stories that can be understood internationally through action: friendship, rivalry, embarrassment, ambition, kindness, family tension, teamwork, competition, a strange discovery, a risky mistake, a clever solution, or a surprising misunderstanding.
-                    - Keep the central idea simple enough to explain in one sentence, but make the situation visually unusual enough that people want to keep watching.
-                    - Make the protagonist active. Do not let the story simply happen to them; they should choose, attempt, fail, adapt, and finally cause the ending.
-                    - Give the protagonist a concrete goal that can be shown on screen, not an abstract goal like "be better" or "believe in yourself".
-                    - Favor strong visual moments: a machine suddenly fails, a hidden object is discovered, a plan goes wrong in a funny way, a race begins, something important disappears, a character gets caught, or a small decision causes a much bigger problem.
-                    - Use one main character and no more than two important supporting characters so the visual world stays clear.
-                    - Keep the tone smart, exciting, funny, mysterious, heartfelt, or adventurous for teens and young adults while remaining enjoyable for adults; NEVER make it preschool-like, babyish, or overly childish.
-                    - The world should feel like premium stylized 3D animation: expressive characters, appealing shapes, cinematic lighting, rich environments, and memorable visual moments.
-                    - Characters may show expressive faces, but the story must never depend on a face being visible; actions, posture, props, and staging must carry the meaning too.
-                    - Avoid realistic live-action wording. The story and every visual prompt must clearly belong to a stylized animated universe.
-                    - Do not imitate, reproduce, or closely paraphrase any existing video or channel story. Use only the general strengths of short motivational tales: immediate conflict, emotional clarity, simple stakes, escalation, and a memorable payoff.
-                    - Avoid generic motivational formulas, fake twists, quote-poster endings, preachy morals, and predictable "good person gets rewarded" plots.
-                    - Avoid overused tropes such as anonymous benefactors, secret fortunes, convenient strangers, mysterious notes, dangerous lenders, hospitals, terminal illness, or a random miracle solving the problem.
-                    - Use simple everyday English, short spoken sentences, concrete nouns, strong verbs, and clear cause-and-effect so the story works for an international audience.
-                    - Do not use fancy literary words, vague symbolism, confusing metaphors, or abstract language.
-                    - Every scene must be easy to understand from one still image and must contain one clear visual action.
-                    - Each narration must be exactly ONE natural spoken sentence. Do not use semicolons, em dashes, or multiple sentence-ending marks inside one scene.
-                    - Vary the opening style from story to story; examples such as "Ellina was repairing...", "Sam was already late when...", or "Daniel grabbed the wrong box..." are style references only, not templates to repeat.
-                    CREATIVE SEEDS
+                    PRIMARY GOAL
+                    Make the viewer think within the first seconds: "Wait... what is happening?" and keep
+                    watching because the next action matters. The story must feel complete, visual, surprising,
+                    emotionally satisfying, and worth rewatching. It must never feel like a generic AI story.
+
+                    NON-NEGOTIABLE ORIGINALITY
+                    - The new story must be materially different from recent history, not a renamed version.
+                    - Change the core situation, conflict, central object, relationship dynamic, setting,
+                      escalation mechanism, turning point, and ending pattern whenever they overlap with recent work.
+                    - Never copy, paraphrase, imitate, or reproduce any existing video, creator, channel, or viral story.
+                    - Do not use a fixed "good person helps someone and gets rewarded" formula.
+                    - Do not reuse the same hook shape, twist type, object, or final emotional beat repeatedly.
+
+                    RETENTION-FIRST STORY DESIGN
+                    Build a clear causal chain, not disconnected events:
+                    HOOK -> IMMEDIATE PROBLEM/QUESTION -> CONCRETE GOAL -> ATTEMPT -> COMPLICATION ->
+                    ESCALATION -> IMPORTANT CHOICE -> CONSEQUENCE -> SURPRISE/REVERSAL -> PAYOFF.
+                    The exact structure may flex when a better story demands it, but every beat must earn its place.
+                    Every 1-2 scenes, something meaningfully changes: information, plan, risk, location, relationship,
+                    object, consequence, or objective. Do not pad scenes.
+
+                    HOOK RULES
+                    - Scene 1 starts in the middle of an observable action.
+                    - Name or clearly identify the protagonist, show a concrete action, and reveal a specific problem,
+                      strange event, risky situation, goal, mistake, or unanswered question immediately.
+                    - The opening must create a clear curiosity gap, not generic atmosphere.
+                    - Never begin with weather, sunrise, scenery, biography, "one day", or long setup.
+                    - The viewer should understand the basic situation visually even before the sentence finishes.
+
+                    STORY QUALITY
+                    - One primary protagonist; up to two important supporting characters.
+                    - Give the protagonist personality through choices and behavior, not exposition.
+                    - Give the protagonist a concrete visible objective.
+                    - Use a real obstacle with understandable stakes.
+                    - Include at least one failed attempt, setback, reversal, or unexpected complication.
+                    - Give the protagonist an active choice with a believable cost.
+                    - The payoff must result from earlier actions, clues, objects, or decisions; never from random luck.
+                    - Prefer smart reveals, visual irony, clever problem-solving, funny consequences, human warmth,
+                      rivalry, curiosity, adventure, awkwardness, or emotional reversals over preachy motivation.
+                    - The ending should make the opening feel more meaningful when remembered.
+                    - No generic moral, life-lesson speech, quote-poster ending, fake inspirational slogan, or narrator lecture.
+
+                    INTERNATIONAL CLARITY
+                    - Use simple everyday English that is easy to understand on first listen.
+                    - Use concrete nouns and strong verbs: grabs, hides, drops, opens, races, blocks, swaps, searches,
+                      misses, notices, chooses, fixes, follows, catches, returns, refuses, reveals.
+                    - Avoid literary language, vague symbolism, complicated metaphors, dense backstory, and abstract psychology.
+                    - Make important information visible through actions, objects, staging, and consequences.
+
+                    VISUAL-FIRST STORYTELLING
+                    - Every scene must work as ONE strong frozen movie frame.
+                    - Each scene has one dominant action and one obvious visual purpose.
+                    - Avoid scenes that only explain thoughts or dialogue that cannot be visualized.
+                    - Vary shot scale and composition across scenes: wide establishing action, medium interaction, close detail,
+                      over-shoulder, low angle, high angle, tracking-feel composition, silhouette, foreground obstruction, etc.
+                    - Vary locations, props, lighting moods, color accents, and staging while preserving character identity.
+                    - Keep the world premium, polished, cinematic, stylized 3D animation for teens and adults; never preschool,
+                      babyish, chibi, anime, or live-action/photorealistic.
+                    - Faces may be expressive, but the story must remain understandable through body language, pose, props,
+                      staging, and action even when a face is partially hidden.
+
+                    CHARACTER BIBLE
+                    Create a protagonist with a stable visual identity that can be repeated exactly across scenes: age 21-35,
+                    hairstyle, hair color, skin tone, body build, signature outfit colors, footwear, and one distinctive accessory.
+                    Give supporting characters equally concise, visually distinct descriptions inside the visual prompts.
+                    Do not randomly change clothing, hair, age, body type, or accessories between scenes.
+
+                    SAFETY / TONE
+                    No graphic violence, gore, sexual content, hateful content, dangerous instructional content, child endangerment,
+                    terminal illness, hospital-rescue melodrama, supernatural powers, magic, miracles, impossible rewards, or traumatic shock bait.
+                    Keep tension suitable for broad audiences and entertainment-focused.
+
+                    CREATIVE SEEDS (USE AS INPUT, NOT A TEMPLATE)
                     Domain: {random.choice(DOMAINS)}
                     Setting: {random.choice(SETTINGS)}
-                    Emotion: {random.choice(EMOTIONS)}
+                    Emotional flavor: {random.choice(EMOTIONS)}
 
                     RECENT HISTORY
                     {recent_text}
 
-                    ORIGINALITY RULE:
-                    - Treat the recent history as a real anti-repetition list.
-                    - Do not reuse the same core conflict, central object, relationship dynamic,
-                      twist mechanism, setting, or ending pattern from a recent story.
-                    - Superficial changes to names or wording are not enough. The actual story
-                      situation and payoff must be materially different.
+                    FINAL SELF-CHECK BEFORE JSON
+                    Quietly verify: Is the hook immediate? Is the goal concrete? Is there real escalation? Is there a meaningful choice?
+                    Does the payoff come from the story itself? Could a viewer recognize this story as different from recent uploads?
+                    Could every scene be illustrated as one distinct frame? Remove anything generic or filler before returning JSON.
 
-                    Return exactly this top-level JSON object:
-
+                    OUTPUT CONTRACT
+                    Return ONLY this top-level JSON object and nothing else:
                     {{
-                      "title": "short hooky title, 3-9 words",
+                      "title": "short memorable hook title, 3-9 words",
                       "hook": "10-20 word opening that creates immediate curiosity",
-                      "description": "2-3 natural sentences for the YouTube description",
+                      "description": "2-3 natural sentences describing the finished Short without clickbait spam",
                       "protagonist": {{
                         "name": "specific adult name",
                         "age": 21-35,
                         "role": "specific role with at least two words",
-                        "visual_identity": "stable character-design description: hairstyle, hair color, skin tone, body build, signature outfit colors, footwear, and one distinctive accessory"
+                        "visual_identity": "stable hairstyle, hair color, skin tone, body build, signature outfit colors, footwear, distinctive accessory"
                       }},
                       "setting": "specific physical setting",
                       "scenes": [
                         {{
                           "scene": 1,
-                          "narration": "12-26 spoken words",
-                          "visual_prompt": "cinematic faceless still-image prompt; include subject, environment, action, lighting and camera framing"
+                          "narration": "one natural spoken sentence, 12-26 words",
+                          "visual_prompt": "detailed animated-film frame prompt with character identity, action, environment, composition, camera, lighting, mood, depth, and exact visual continuity"
                         }}
                       ]
                     }}
 
-                    SCENE REQUIREMENTS
-                    - Use 7-16 scenes, choosing the count that best fits the story. This is validated after generation.
-                    - Keep narration lengths natural for the chosen scene count: target roughly 17-21 words when practical, but shorten or lengthen individual scenes as needed so the complete story stays coherent and the hard 12-26 word range and 170-230 total-word range are satisfied.
-                    - Total narration should target 170-210 words when practical; never add filler just to reach a number.
-                    - EVERY narration must be exactly ONE sentence.
-                    - Keep each sentence direct, conversational, and easy to speak aloud.
-                    - Scenes must form one continuous causal story with no unexplained jumps.
-                    - Choose the scene count based on the story, not a fixed template.
-                    - Every scene must add new information, action, decision, consequence, discovery, escalation, or emotional change; never create filler scenes.
-                    - Scene 1 must name or clearly identify the protagonist, show a specific action, and reveal the immediate problem, surprise, or goal in the same sentence.
-                    - Scene 2 should make the problem more concrete. Scene 3 should make the goal, risk, or difficult choice unmistakable.
-                    - At least one middle scene should contain a setback, surprise, reversal, funny complication, or discovery that changes what the viewer expects.
-                    - Final scenes must deliver a clear consequence and satisfying payoff that connects back to the opening hook.
-                    - Every scene must be visually distinct and easy to understand as one animated movie frame.
-
-                    STORY REQUIREMENTS
-                    - Young-adult protagonist, preferably 21-35, with a recognizable personality and a concrete visual design.
-                    - One meaningful friendship, sibling, teammate, coworker, mentor, or rival relationship.
-                    - Concrete goal stated or obvious from the first three scenes.
-                    - Real external obstacle that can be seen or understood immediately.
-                    - Two plausible options with different costs.
-                    - The chosen option creates a believable consequence that follows directly from the choice.
-                    - The ending changes the situation through a believable human consequence, not luck, magic, or an unexplained reward.
-                    - No preachy moral at the end.
-                    - The final narration should land naturally on what changed, not on a generic life lesson.
-                    - A viewer should be able to retell the story in 2-3 simple sentences after hearing it once.
-
-                    BANNED:
-                    preachy motivational speech, quote-poster moral, generic office anecdote,
-                    anonymous benefactor, secret fortune, lottery win, convenient stranger,
-                    terminal illness, hospital rescue, random miracle, generic "believe in yourself" ending,
-                    generic maintenance task with no twist, slow scenic opening, long exposition,
-                    graphic violence, sexual content, hateful content, or frightening horror imagery.
-
-                    Do NOT mention these instructions in the JSON.
-                    """
+                    SCENE CONTRACT
+                    - Use 7-16 scenes based on natural pacing.
+                    - Target about 17-21 narration words per scene when practical; hard range is 12-26.
+                    - Total narration must remain 170-230 words without filler.
+                    - Every narration is exactly ONE natural spoken sentence.
+                    - Scene 1: protagonist + action + immediate problem/question/stakes.
+                    - Scene 2: make the problem concrete.
+                    - Scene 3: establish the real goal, risk, or difficult choice.
+                    - Middle: attempt, complication, setback, discovery, reversal, or escalation.
+                    - Final: consequence + payoff that directly connects to earlier events.
+                    - Every scene must introduce new visual information or meaningful change.
+                    - Never repeat essentially the same action in consecutive scenes.
+                    - Never use filler reaction shots with no story function.
+                    - Avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. in narration when possible.
+                    - No semicolons, em dashes, or multiple sentence-ending marks inside a scene narration.
+              """
 
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
@@ -802,19 +842,21 @@ jobs:
               prompt = (
                   visual_anchor
                   + scene["visual_prompt"]
-                  + ", premium stylized 3D animated feature-film still, polished cinematic character design, "
-                    "appealing expressive animated characters, youthful but not childish, broad-audience entertainment, "
-                    "rich stylized environments, cinematic depth, strong composition, clear visual storytelling, "
-                    "one focal action only, exact action from the narration, clear foreground/midground/background separation, "
-                    "consistent character identity across scenes, correct human or creature anatomy for the chosen design, "
-                    "head naturally attached to neck and aligned with torso, face and eyes oriented in the same believable direction as the head, "
-                    "natural shoulders, elbows, wrists, hips, knees, hands and fingers, correct limb count, believable pose and weight, "
-                    "no twisted spine, no impossible neck rotation, no backward-facing head on a forward-facing body, no fused limbs, "
-                    "no duplicate characters, no duplicate limbs, no extra fingers, no deformed hands, no accidental mirror-body, "
-                    "do not render as live-action photography, do not render as photorealistic human photography, do not render as anime, "
-                    "do not render as chibi or preschool cartoon, clean readable silhouettes, expressive body language, "
-                    "soft cinematic key light, practical rim light, tasteful color contrast, filmic depth of field, "
-                    "vertical 9:16, no readable text, no watermark"
+                  + ", premium stylized 3D animated feature-film frame, sophisticated global entertainment aesthetic, "
+                    "single frozen moment, one dominant readable action, strong visual storytelling, expressive but believable character design, "
+                    "consistent protagonist identity exactly matching the character bible, same age, face design, hairstyle, hair color, skin tone, body build, "
+                    "outfit colors, footwear and signature accessory in every scene, supporting characters visually distinct and consistent, "
+                    "specific environment details that support the story, carefully staged foreground midground and background layers, "
+                    "cinematic camera composition chosen for this scene, varied shot scale and angle across the story, natural perspective, "
+                    "clear subject silhouette, hands visibly performing the stated action, props positioned logically, believable object scale and contact, "
+                    "correct anatomy, natural neck-to-head connection, aligned spine and torso, plausible shoulders elbows wrists hips knees and hands, "
+                    "correct limb count, believable weight and balance, physically coherent pose, consistent left-right orientation, "
+                    "no twisted neck, no broken wrists, no fused fingers, no extra fingers, no duplicate limbs, no duplicate people, no mirrored body, "
+                    "no accidental extra props, no floating objects unless clearly justified by the action, no impossible geometry, "
+                    "lighting and color palette tailored to the story beat, cinematic key light, controlled rim light, atmospheric depth, polished materials, "
+                    "subtle depth of field, high detail without visual clutter, emotionally readable body language, premium 3D animation, "
+                    "not live-action, not photorealistic human photography, not anime, not chibi, not preschool cartoon, not low-detail CGI, "
+                    "vertical 9:16, no readable text, no logos, no watermark"
               )
 
               encoded = urllib.parse.quote(prompt, safe="")
