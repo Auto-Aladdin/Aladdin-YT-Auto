@@ -289,6 +289,28 @@ jobs:
               return None
 
 
+          def normalize_scene_numbers(story):
+              """Canonicalize model scene numbering without changing scene order or story content."""
+              if not isinstance(story, dict):
+                  return story
+              scenes = story.get("scenes")
+              if not isinstance(scenes, list):
+                  return story
+              for idx, scene in enumerate(scenes, 1):
+                  if not isinstance(scene, dict):
+                      continue
+                  raw = scene.get("scene", scene.get("scene_number", scene.get("number", scene.get("n"))))
+                  if isinstance(raw, str):
+                      m = re.search(r"\d+", raw.strip())
+                      raw = int(m.group()) if m else None
+                  elif isinstance(raw, float) and raw.is_integer():
+                      raw = int(raw)
+                  # The array order is authoritative. We canonicalize to 1..N so
+                  # harmless formatting differences cannot reject an otherwise valid story.
+                  scene["scene"] = idx
+              return story
+
+
           def story_issue(story):
               if not isinstance(story, dict):
                   return "Story is not an object."
@@ -308,6 +330,8 @@ jobs:
               scenes = story["scenes"]
               if not isinstance(scenes, list) or not 9 <= len(scenes) <= 11:
                   return "Story must contain 9-11 scenes."
+              normalize_scene_numbers(story)
+              scenes = story["scenes"]
               nums = [s.get("scene") if isinstance(s, dict) else None for s in scenes]
               if nums != list(range(1, len(scenes) + 1)):
                   return "Scene numbers must be consecutive starting at 1."
@@ -383,7 +407,7 @@ jobs:
           title, hook, setting, protagonist, desire, stakes, obstacle, choice, cost, consequence, turning_point, payoff, description, characters, scenes.
           The protagonist object must contain name, age, role, visual_identity.
           Each character must contain name, role, visual_identity.
-          Each scene must contain scene number and narration.
+          Each scene must contain an integer `scene` field numbered 1, 2, 3... in array order, plus narration.
 
           Story rules:
           - 9-11 scenes.
@@ -477,11 +501,13 @@ jobs:
                   print(f"SELECTED PREMISE — score={selected.get('score', 0)}")
 
                   candidate = call_groq(story_prompt(selected), temperature=0.64, max_tokens=4000)
+                  normalize_scene_numbers(candidate)
                   issue = story_issue(candidate)
                   if issue:
                       print("CANDIDATE LOCAL CHECK:", issue)
                       if issue.startswith("Story is too short") or issue.endswith("too vague.") or issue.startswith("Hook is too short") or issue.startswith("Missing story field:"):
                           repaired = call_groq(repair_prompt(candidate, issue), temperature=0.32, max_tokens=4000)
+                          normalize_scene_numbers(repaired)
                           candidate = repaired
                           issue = story_issue(candidate)
                           print("REPAIR RESULT:", issue or "PASS")
@@ -519,6 +545,7 @@ jobs:
                           temperature=0.55,
                           max_tokens=4000,
                       )
+                      normalize_scene_numbers(repair)
                       repair_issue = story_issue(repair)
                       if not repair_issue:
                           repair_critique = normalize_critic(call_groq(critic_prompt(repair), temperature=0.10, max_tokens=1200))
