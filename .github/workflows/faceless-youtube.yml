@@ -617,8 +617,6 @@ jobs:
               voice,
               "--rate",
               "+2%",
-              "--pitch",
-              "0Hz",
               "--text",
               script,
               "--write-media",
