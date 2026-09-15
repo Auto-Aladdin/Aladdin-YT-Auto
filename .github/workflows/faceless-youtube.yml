@@ -44,363 +44,117 @@ jobs:
           MIN_DURATION = 45
           MAX_DURATION = 180
 
-          MAX_STORY_ATTEMPTS = 4
-          MAX_API_CALLS = 36
-          MIN_SECONDS_BETWEEN_CALLS = 9.0
+          MAX_STORY_ATTEMPTS = 3
+          MAX_API_CALLS = 18
+          MIN_SECONDS_BETWEEN_CALLS = 10.0
+          MAX_API_RETRIES = 2
 
           API_KEY = os.environ["GROQ_API_KEY"]
           rng = random.SystemRandom()
 
-          # ------------------------------------------------------------------
-          # Creative domains are deliberately broad. They are not all "workers
-          # helping people" and they do not funnel the model into one trope family.
-          # ------------------------------------------------------------------
           DOMAINS = [
-              "apartment building logistics",
-              "small business operations",
-              "public-service administration",
-              "neighborhood maintenance",
-              "craft and repair",
-              "local transportation logistics",
-              "community event preparation",
-              "education administration",
-              "small-scale manufacturing",
-              "retail inventory and ordering",
-              "archival or records work",
-              "property management",
-              "food preparation logistics",
-              "equipment rental",
-              "local delivery coordination",
-              "building access and security",
-              "second-hand commerce",
-              "market stall operations",
-              "sports facility operations",
-              "volunteer organization logistics",
-              "adult sibling coordination",
-              "neighborhood committee dispute",
-              "community class administration",
-              "estate clean-out logistics",
-              "shared workspace management",
-              "local archive preservation",
-              "small event cancellation and recovery",
-              "rental property handover",
+              "adult sibling responsibility",
+              "neighbor relationship",
+              "customer and specialist",
+              "mentor and former apprentice",
+              "two coworkers handing over unfinished work",
+              "tenant and building manager",
+              "vendor and regular customer",
+              "teacher and adult administrator",
+              "friends managing an old obligation",
+              "property caretaker and renter",
+              "community organizer and volunteer",
+              "adult family paperwork",
+              "shared workspace disagreement",
+              "small business partnership",
+              "local service dispute",
           ]
 
           SETTINGS = [
-              "a neighborhood print-and-copy shop before opening",
-              "the back office of a small apartment building",
-              "a community sports hall during setup",
-              "a local equipment-rental counter",
-              "a municipal records room in the late afternoon",
-              "a modest repair bench inside a hardware store",
-              "a small bakery preparation room before the first customers arrive",
-              "a neighborhood market storage area",
-              "a community library workroom",
-              "a local bicycle workshop",
-              "a school administration office after classes",
+              "a neighborhood print shop before opening",
+              "a small apartment building office",
+              "a local library workroom",
+              "a modest tailor shop",
+              "a community hall kitchen",
+              "a bicycle storage room",
               "a small ceramics studio",
-              "a building maintenance corridor",
-              "a local photography lab",
-              "a modest tailor's workroom",
-              "a community garden tool shed",
-              "a second-hand appliance shop",
-              "a neighborhood sign-making workshop",
-              "a small packaging room behind a retail shop",
-              "a public recreation center office",
-              "a laundromat during a quiet afternoon",
-              "a neighborhood storage unit corridor",
-              "a small second-hand furniture showroom",
-              "a shared artist workspace",
-              "a local community hall kitchen",
-              "a residential building lobby during maintenance",
+              "a second-hand furniture showroom",
+              "a quiet market office",
               "a public archive reading room",
-              "a modest bicycle storage room",
-              "a neighborhood market office",
-          ]
-
-          RELATIONSHIPS = [
-              "coworkers with unequal responsibility",
-              "an adult tenant and a building manager",
-              "a customer and a specialist",
-              "two siblings managing a practical obligation",
-              "a supervisor and a trainee",
-              "two neighbors with different priorities",
-              "a volunteer coordinator and a volunteer",
-              "a teacher and an adult administrator",
-              "a vendor and a regular customer",
-              "two colleagues handing over unfinished work",
-              "a repair technician and an owner",
-              "a renter and a property caretaker",
-              "adult siblings dividing a practical responsibility",
-              "a former apprentice and a mentor",
-              "two neighbors resolving a recurring nuisance",
-              "a customer and a specialist who remember a past mistake",
-              "two friends handling an unfinished obligation",
-              "an adult child and an elderly relative managing paperwork",
-          ]
-
-          MECHANISMS = [
-              "a measurable discrepancy is discovered shortly before handoff",
-              "one scarce tool or resource is needed by two legitimate tasks",
-              "a previous small mistake changes what the protagonist must do next",
-              "a deadline shifts because an external condition changes",
-              "a routine process produces an unexpected but plausible result",
-              "a replacement part does not fit and forces a different method",
-              "two records disagree and someone must determine which is reliable",
-              "an item is prepared correctly but for the wrong destination",
-              "a handoff fails because one important detail was misunderstood",
-              "a practical shortcut creates a consequence that must be repaired",
-              "a failed first attempt reveals information that changes the plan",
-              "a limited amount of time, space, or equipment forces a trade-off",
+              "a building maintenance room",
+              "a shared artist workspace",
+              "a neighborhood repair counter",
+              "a community garden shed",
+              "a small photography lab",
           ]
 
           EMOTIONS = [
-              "relief",
+              "respect earned slowly",
               "quiet pride",
               "regret turning into acceptance",
-              "respect earned slowly",
-              "belonging",
               "bittersweet relief",
-              "gratitude without sentimentality",
-              "quiet joy",
-              "determination",
+              "belonging",
               "forgiveness after evidence",
+              "quiet joy",
               "surprise",
+              "determination",
           ]
 
           BANNED_PHRASES = [
-              "believe in yourself",
-              "never give up",
-              "the human spirit",
-              "everything happens for a reason",
-              "when one door closes",
-              "follow your dreams",
-              "little did they know",
-              "the power of hope",
-              "sometimes life",
-              "in the end, it was not about",
+              "believe in yourself", "never give up", "the human spirit",
+              "everything happens for a reason", "when one door closes",
+              "follow your dreams", "little did they know", "the power of hope",
+              "sometimes life", "in the end, it was not about",
           ]
 
           BANNED_PATTERNS = [
-              "child in danger",
-              "children in danger",
-              "terminal illness",
-              "hospital reveal",
-              "anonymous benefactor",
-              "secret benefactor",
-              "lottery ticket",
-              "hidden fortune",
-              "miraculous rescue",
-              "magic rescue",
-              "magical",
-              "supernatural",
-              "mysteriously appeared",
-              "miraculously",
-              "destiny",
-              "fate chose",
-              "ancient box",
-              "secret message",
-              "secret envelope",
-              "sudden promotion",
-              "instant promotion",
-              "surprise bonus",
-              "surprise promotion",
-              "license revoked",
-              "stuck in an elevator",
-              "trapped in an elevator",
-              "elevator hatch",
-              "emergency light",
-              "power failure",
-              "blackout",
-              "abandoned concert hall",
-              "last performance",
-              "violin audition",
-              "father's unfinished",
-              "rooftop confession",
-              "glowing receipt",
-              "red ribbon",
-              "countdown clock",
-              "ticking clock",
-              "coffee shop dilemma",
-              "parent versus work",
-              "work versus child",
-              "lie versus truth",
-              "keep the money",
-              "return the money",
-              "delivery driver",
+              "child in danger", "children in danger", "terminal illness", "hospital reveal",
+              "anonymous benefactor", "secret benefactor", "lottery ticket", "hidden fortune",
+              "miraculous rescue", "magic rescue", "magical", "supernatural",
+              "mysteriously appeared", "miraculously", "destiny", "fate chose",
+              "secret message", "secret envelope", "sudden promotion", "instant promotion",
+              "surprise bonus", "surprise promotion", "license revoked", "stuck in an elevator",
+              "trapped in an elevator", "elevator hatch", "emergency light", "power failure",
+              "blackout", "abandoned concert hall", "last performance", "violin audition",
+              "father's unfinished", "rooftop confession", "glowing receipt", "red ribbon",
+              "countdown clock", "ticking clock", "coffee shop dilemma", "parent versus work",
+              "work versus child", "lie versus truth", "keep the money", "return the money",
+              "delivery driver", "secret benefactor", "anonymous donor", "thank-you note",
           ]
 
-          PREMISE_SCHEMA = {
-              "type": "object",
-              "properties": {
-                  "premises": {
-                      "type": "array",
-                      "minItems": 4,
-                      "maxItems": 8,
-                      "items": {
-                          "type": "object",
-                          "properties": {
-                              "title_seed": {"type": "string"},
-                              "protagonist_name": {"type": "string"},
-                              "protagonist_age": {"type": "integer", "minimum": 21, "maximum": 70},
-                              "protagonist_role": {"type": "string"},
-                              "setting": {"type": "string"},
-                              "immediate_goal": {"type": "string"},
-                              "mechanism": {"type": "string"},
-                              "choice": {"type": "string"},
-                              "cost": {"type": "string"},
-                              "lasting_consequence": {"type": "string"},
-                              "visual_motif": {"type": "string"},
-                              "why_fresh": {"type": "string"},
-                              "score": {"type": "integer", "minimum": 0, "maximum": 10},
-                          },
-                          "required": [
-                              "title_seed", "protagonist_name", "protagonist_age",
-                              "protagonist_role", "setting", "immediate_goal",
-                              "mechanism", "choice", "cost", "lasting_consequence",
-                              "visual_motif", "why_fresh", "score",
-                          ],
-                          "additionalProperties": False,
-                      },
-                  },
-              },
-              "required": ["premises"],
-              "additionalProperties": False,
-          }
+          GENERIC_ENGINE_PATTERNS = [
+              "data integrity vs speed", "manual versus machine", "wait or do it now",
+              "repair it before the event", "fix it before the game", "deadline vs quality",
+              "finish before the boss arrives", "finish before the mayor arrives",
+          ]
 
-          # Groq strict JSON Schema requires every declared property to appear in
-          # the top-level required array. Keep the schema contract explicit; any
-          # content-quality weakness is handled by Python validation/repair after
-          # a structurally valid response is received.
-          STORY_SCHEMA = {
-              "type": "object",
-              "properties": {
-                  "title": {"type": "string"},
-                  "hook": {"type": "string"},
-                  "setting": {"type": "string"},
-                  "protagonist": {
-                      "type": "object",
-                      "properties": {
-                          "name": {"type": "string"},
-                          "age": {"type": "integer", "minimum": 21, "maximum": 70},
-                          "role": {"type": "string"},
-                          "visual_identity": {"type": "string"},
-                      },
-                      "required": ["name", "age", "role", "visual_identity"],
-                      "additionalProperties": False,
-                  },
-                  "desire": {"type": "string"},
-                  "stakes": {"type": "string"},
-                  "obstacle": {"type": "string"},
-                  "choice": {"type": "string"},
-                  "cost": {"type": "string"},
-                  "consequence": {"type": "string"},
-                  "turning_point": {"type": "string"},
-                  "payoff": {"type": "string"},
-                  "description": {"type": "string"},
-                  "characters": {
-                      "type": "array",
-                      "minItems": 1,
-                      "maxItems": 5,
-                      "items": {
-                          "type": "object",
-                          "properties": {
-                              "name": {"type": "string"},
-                              "role": {"type": "string"},
-                              "visual_identity": {"type": "string"},
-                          },
-                          "required": ["name", "role", "visual_identity"],
-                          "additionalProperties": False,
-                      },
-                  },
-                  "scenes": {
-                      "type": "array",
-                      "minItems": 7,
-                      "maxItems": 12,
-                      "items": {
-                          "type": "object",
-                          "properties": {
-                              "scene": {"type": "integer", "minimum": 1, "maximum": 12},
-                              "narration": {"type": "string"},
-                          },
-                          "required": ["scene", "narration"],
-                          "additionalProperties": False,
-                      },
-                  },
-              },
-              "required": [
-                  "title", "hook", "setting", "protagonist", "desire", "stakes",
-                  "obstacle", "choice", "cost", "consequence", "turning_point",
-                  "payoff", "description", "characters", "scenes"
-              ],
-              "additionalProperties": False,
-          }
+          GENERIC_ENDINGS = [
+              "got a bonus", "received a bonus", "got promoted", "received a promotion",
+              "client approved", "customer approved", "everyone applauded", "everyone clapped",
+              "everything worked out", "everything was solved", "left a thank you note",
+              "left a thank-you note", "earned a reward",
+          ]
 
-          CRITIC_SCHEMA = {
-              "type": "object",
-              "properties": {
-                  "pass": {"type": "boolean"},
-                  "hook_score": {"type": "integer", "minimum": 0, "maximum": 10},
-                  "originality_score": {"type": "integer", "minimum": 0, "maximum": 10},
-                  "believability_score": {"type": "integer", "minimum": 0, "maximum": 10},
-                  "emotional_score": {"type": "integer", "minimum": 0, "maximum": 10},
-                  "conflict_score": {"type": "integer", "minimum": 0, "maximum": 10},
-                  "ending_score": {"type": "integer", "minimum": 0, "maximum": 10},
-                  "visual_score": {"type": "integer", "minimum": 0, "maximum": 10},
-                  "issues": {"type": "array", "items": {"type": "string"}},
-              },
-              "required": [
-                  "pass", "hook_score", "originality_score", "believability_score",
-                  "emotional_score", "conflict_score", "ending_score", "visual_score", "issues",
-              ],
-              "additionalProperties": False,
-          }
 
-          def validate_strict_schema_contract(schema, label):
-              if schema.get("type") != "object":
-                  raise RuntimeError(f"{label}: root schema must be an object.")
-              props = schema.get("properties", {})
-              required = schema.get("required")
-              if not isinstance(required, list):
-                  raise RuntimeError(f"{label}: required must be an array.")
-              missing = sorted(set(props) - set(required))
-              if missing:
-                  raise RuntimeError(
-                      f"{label}: Groq strict schema is invalid; missing required properties: {missing}"
-                  )
-              if len(required) != len(set(required)):
-                  raise RuntimeError(f"{label}: required contains duplicates.")
-              for key, value in props.items():
-                  if value.get("type") == "object":
-                      validate_strict_schema_contract(value, f"{label}.{key}")
-                  elif value.get("type") == "array":
-                      item_schema = value.get("items")
-                      if isinstance(item_schema, dict) and item_schema.get("type") == "object":
-                          validate_strict_schema_contract(item_schema, f"{label}.{key}[]")
+          def load_history():
+              try:
+                  data = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
+                  return data if isinstance(data, list) else []
+              except Exception:
+                  return []
 
-          validate_strict_schema_contract(PREMISE_SCHEMA, "PREMISE_SCHEMA")
-          validate_strict_schema_contract(STORY_SCHEMA, "STORY_SCHEMA")
-          validate_strict_schema_contract(CRITIC_SCHEMA, "CRITIC_SCHEMA")
-
-          history = []
-          try:
-              loaded = json.loads(HISTORY_FILE.read_text(encoding="utf-8"))
-              if isinstance(loaded, list):
-                  history = loaded
-          except Exception:
-              history = []
-
+          history = load_history()
           recent = history[-15:]
           recent_text = "\n".join(
-              f"- {str(item.get('title', ''))[:100]} | {str(item.get('premise', ''))[:240]} | {str(item.get('setting', ''))[:100]}"
-              for item in recent
+              f"- {str(x.get('title',''))[:80]} | {str(x.get('premise',''))[:180]} | {str(x.get('setting',''))[:80]}"
+              for x in recent
           ) or "NONE"
 
           api_calls = 0
           last_call_started = 0.0
 
 
-          def _parse_duration(value, default=10.0):
+          def parse_duration(value, default=10.0):
               if value is None:
                   return default
               text = str(value).strip().lower()
@@ -421,36 +175,27 @@ jobs:
               if second:
                   total += float(second.group(1))
                   matched = True
-              if matched:
-                  return total
-              try:
-                  return float(text)
-              except Exception:
-                  return default
+              return total if matched else default
 
 
-          def call_groq(prompt, schema, temperature=0.6, max_tokens=3000):
-              # Defensive preflight: never send an invalid strict schema to Groq.
-              validate_strict_schema_contract(schema, "response_format")
+          def call_groq(prompt, temperature=0.6, max_tokens=3500):
               global api_calls, last_call_started
               if api_calls >= MAX_API_CALLS:
-                  raise RuntimeError("Internal API-call budget exhausted before publication-ready story was found.")
-
+                  raise RuntimeError("Internal API-call budget exhausted.")
               gap = time.time() - last_call_started
               if gap < MIN_SECONDS_BETWEEN_CALLS:
                   time.sleep(MIN_SECONDS_BETWEEN_CALLS - gap)
 
               api_calls += 1
               last_call_started = time.time()
-
               payload = {
                   "model": MODEL,
                   "messages": [
                       {
                           "role": "system",
                           "content": (
-                              "You are a senior short-film writer and story editor. "
-                              "Return ONLY valid JSON matching the supplied schema."
+                              "Return ONLY valid JSON. No markdown, no commentary, no code fences. "
+                              "Follow the requested JSON shape exactly enough for the Python validator."
                           ),
                       },
                       {"role": "user", "content": prompt},
@@ -459,26 +204,19 @@ jobs:
                   "include_reasoning": False,
                   "temperature": temperature,
                   "max_completion_tokens": max_tokens,
-                  "response_format": {
-                      "type": "json_schema",
-                      "json_schema": {
-                          "name": "structured_output",
-                          "strict": True,
-                          "schema": schema,
-                      },
-                  },
+                  "response_format": {"type": "json_object"},
               }
 
-              attempts = 0
-              while True:
-                  attempts += 1
+              attempt = 0
+              while attempt < MAX_API_RETRIES:
+                  attempt += 1
                   request = urllib.request.Request(
                       API_URL,
                       data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
                       headers={
                           "Authorization": f"Bearer {API_KEY}",
                           "Content-Type": "application/json",
-                          "User-Agent": "Aladdin-YT-Auto/Final-Workflow-V6",
+                          "User-Agent": "Aladdin-YT-Auto/Final-V9",
                       },
                       method="POST",
                   )
@@ -488,17 +226,24 @@ jobs:
                       content = body["choices"][0]["message"].get("content", "")
                       if not content:
                           raise RuntimeError("Groq returned empty content.")
-                      return json.loads(content)
+                      try:
+                          return json.loads(content)
+                      except json.JSONDecodeError as exc:
+                          if attempt < MAX_API_RETRIES:
+                              print("Groq returned invalid JSON syntax. Retrying once...")
+                              time.sleep(2)
+                              continue
+                          raise RuntimeError(f"Groq returned invalid JSON: {exc}") from exc
                   except urllib.error.HTTPError as exc:
                       raw = exc.read().decode("utf-8", errors="replace")
-                      if exc.code == 429 and attempts == 1:
-                          retry_after = _parse_duration(exc.headers.get("retry-after"), 10.0)
-                          reset = _parse_duration(exc.headers.get("x-ratelimit-reset-tokens"), 10.0)
-                          wait = min(max(5.0, retry_after, reset) + 1.0, 75.0)
+                      if exc.code == 429 and attempt < MAX_API_RETRIES:
+                          retry_after = parse_duration(exc.headers.get("retry-after"), 10.0)
+                          reset = parse_duration(exc.headers.get("x-ratelimit-reset-tokens"), 10.0)
+                          wait = min(max(8.0, retry_after, reset) + 1.0, 75.0)
                           print(f"Groq HTTP 429. Waiting {wait:.1f}s using rate-limit headers...")
                           time.sleep(wait)
                           continue
-                      if exc.code in (500, 502, 503, 504) and attempts == 1:
+                      if exc.code in (500, 502, 503, 504) and attempt < MAX_API_RETRIES:
                           print(f"Groq HTTP {exc.code}. Retrying once in 5s...")
                           time.sleep(5)
                           continue
@@ -506,666 +251,329 @@ jobs:
 
 
           def word_count(story):
-              return sum(len(scene["narration"].split()) for scene in story.get("scenes", []))
+              return sum(len(str(s.get("narration", "")).split()) for s in story.get("scenes", []))
 
 
           def story_text(story):
               return json.dumps(story, ensure_ascii=False).lower()
 
 
-          NARRATIVE_FIELDS = [
-              "desire", "stakes", "obstacle", "choice", "cost",
-              "consequence", "turning_point", "payoff", "description",
-          ]
-
-          def normalize_story_object(story):
-              if not isinstance(story, dict):
-                  return story
-              # Make omitted optional narrative fields explicit so deterministic
-              # validation/targeted repair can handle them cleanly.
-              for field in NARRATIVE_FIELDS:
-                  story.setdefault(field, "")
-              story.setdefault("characters", [])
-              return story
-
-          def local_story_check(story):
-              story = normalize_story_object(story)
-              if not isinstance(story, dict):
-                  return "Story is not an object."
-
-              scenes = story.get("scenes", [])
-              if not 9 <= len(scenes) <= 11:
-                  return "Story must contain 9-11 scenes."
-
-              numbers = [s.get("scene") for s in scenes]
-              if numbers != list(range(1, len(scenes) + 1)):
-                  return "Scene numbers must be consecutive starting at 1."
-
-              words = word_count(story)
-              if words < MIN_WORDS:
-                  return f"Story is too short at {words} words; minimum is {MIN_WORDS}."
-              if words > MAX_WORDS:
-                  return f"Story is too long at {words} words; maximum is {MAX_WORDS}."
-
-              protagonist = story.get("protagonist") or {}
-              if not isinstance(protagonist, dict):
-                  return "Protagonist must be a structured object."
-
-              name = " ".join(str(protagonist.get("name", "")).split())
-              role = " ".join(str(protagonist.get("role", "")).split())
-              age = protagonist.get("age")
-              if not re.fullmatch(r"[A-Z][a-z]{1,20}(?: [A-Z][a-z]{1,20})?", name):
-                  return "Protagonist name must be a specific adult name."
-              if not isinstance(age, int) or not 21 <= age <= 70:
-                  return "Protagonist age must be an adult age from 21-70."
-              if len(role.split()) < 2:
-                  return "Protagonist role is too vague."
-
-              text = story_text(story)
+          def has_banned(text):
               for phrase in BANNED_PHRASES:
                   if phrase in text:
                       return f"Cliche detected: {phrase}"
               for phrase in BANNED_PATTERNS:
                   if phrase in text:
                       return f"Banned story pattern detected: {phrase}"
-
-              fields = [
-                  ("desire", 8), ("stakes", 8), ("obstacle", 8), ("choice", 8),
-                  ("cost", 8), ("consequence", 8), ("turning_point", 8), ("payoff", 8),
-              ]
-              for field, minimum in fields:
-                  if len(str(story.get(field, "")).split()) < minimum:
-                      return f"{field} is too vague."
-
-              if len(str(story.get("hook", "")).split()) < 10:
-                  return "Hook is too short to establish immediate concrete curiosity."
-
-              generic_endings = [
-                  "got a bonus", "got promoted", "received a promotion", "client approved",
-                  "customer approved", "left a thank you note", "left a thank-you note",
-                  "everyone applauded", "everyone clapped", "everything was solved",
-                  "everything worked out",
-              ]
-              for phrase in generic_endings:
-                  if phrase in text:
-                      return f"Convenient reward ending detected: {phrase}"
-
-              # Scene-level length makes the 105-word failure practically impossible
-              # when the model follows the contract: nine scenes must average >= 17 words.
-              scene_lengths = [len(s["narration"].split()) for s in scenes]
-              if min(scene_lengths) < 10:
-                  return "At least one scene is too thin; every scene needs at least 10 spoken words."
-              if sum(length < 14 for length in scene_lengths) > 2:
-                  return "Too many scenes are underdeveloped; rebuild with fuller action beats."
-
               return None
 
 
-          def normalize_critique(critique):
-              keys = [
-                  "hook_score", "originality_score", "believability_score",
-                  "emotional_score", "conflict_score", "ending_score", "visual_score",
-              ]
-              scores = [critique.get(k, -1) for k in keys]
-              numeric_ok = all(isinstance(v, int) and not isinstance(v, bool) and 0 <= v <= 10 for v in scores)
-              average = (sum(scores) / len(scores)) if numeric_ok else 0.0
-              deterministic_pass = numeric_ok and all(v >= 7 for v in scores) and average >= 6.8
-              out = dict(critique)
-              out["pass"] = deterministic_pass
-              out["score_average"] = round(average, 2)
-              out["all_axes_at_least_7"] = numeric_ok and all(v >= 7 for v in scores)
-              out["model_pass"] = bool(critique.get("pass"))
-              if out["model_pass"] != deterministic_pass:
-                  out.setdefault("issues", []).append("Critic boolean conflicted with deterministic numeric gate.")
-              return out
+          def premise_issue(p):
+              if not isinstance(p, dict):
+                  return "Premise is not an object."
+              required = ["title", "protagonist", "goal", "conflict", "choice", "consequence", "relationship", "visual"]
+              for k in required:
+                  if not str(p.get(k, "")).strip():
+                      return f"Premise missing {k}."
+              age = p.get("age")
+              if not isinstance(age, int) or not 21 <= age <= 70:
+                  return "Premise protagonist age is invalid."
+              text = json.dumps(p, ensure_ascii=False).lower()
+              banned = has_banned(text)
+              if banned:
+                  return banned
+              if any(x in text for x in GENERIC_ENGINE_PATTERNS):
+                  return "Generic procedural story engine detected."
+              if len(str(p.get("why_fresh", "" )).split()) < 6:
+                  return "Premise freshness explanation is too thin."
+              return None
 
 
-          def make_premise_prompt(attempt):
-              domain = rng.choice(DOMAINS)
-              setting = rng.choice(SETTINGS)
-              relationship = rng.choice(RELATIONSHIPS)
-              mechanism = rng.choice(MECHANISMS)
-              emotion = rng.choice(EMOTIONS)
+          def story_issue(story):
+              if not isinstance(story, dict):
+                  return "Story is not an object."
+              core = ["title", "hook", "setting", "protagonist", "desire", "stakes", "obstacle", "choice", "cost", "consequence", "turning_point", "payoff", "description", "characters", "scenes"]
+              for k in core:
+                  if k not in story:
+                      return f"Missing story field: {k}."
+              if not isinstance(story["protagonist"], dict):
+                  return "Protagonist must be an object."
+              pr = story["protagonist"]
+              if not re.fullmatch(r"[A-Z][a-z]{1,20}(?: [A-Z][a-z]{1,20})?", str(pr.get("name", "")).strip()):
+                  return "Protagonist name must be a specific adult name."
+              if not isinstance(pr.get("age"), int) or not 21 <= pr["age"] <= 70:
+                  return "Protagonist age must be 21-70."
+              if len(str(pr.get("role", "")).split()) < 2:
+                  return "Protagonist role is too vague."
+              scenes = story["scenes"]
+              if not isinstance(scenes, list) or not 9 <= len(scenes) <= 11:
+                  return "Story must contain 9-11 scenes."
+              nums = [s.get("scene") if isinstance(s, dict) else None for s in scenes]
+              if nums != list(range(1, len(scenes) + 1)):
+                  return "Scene numbers must be consecutive starting at 1."
+              lengths = [len(str(s.get("narration", "")).split()) for s in scenes]
+              if any(n < 12 for n in lengths):
+                  return "Every scene needs at least 12 spoken words."
+              words = sum(lengths)
+              if words < MIN_WORDS:
+                  return f"Story is too short at {words} words; minimum is {MIN_WORDS}."
+              if words > MAX_WORDS:
+                  return f"Story is too long at {words} words; maximum is {MAX_WORDS}."
+              for field in ["desire", "stakes", "obstacle", "choice", "cost", "consequence", "turning_point", "payoff"]:
+                  if len(str(story.get(field, "")).split()) < 8:
+                      return f"{field} is too vague."
+              if len(str(story.get("hook", "")).split()) < 10:
+                  return "Hook is too short to establish immediate curiosity."
+              text = story_text(story)
+              banned = has_banned(text)
+              if banned:
+                  return banned
+              for phrase in GENERIC_ENDINGS:
+                  if phrase in text:
+                      return f"Convenient reward ending detected: {phrase}"
+              if not isinstance(story.get("characters"), list) or not (1 <= len(story["characters"]) <= 5):
+                  return "Characters list must contain 1-5 adults."
+              for c in story["characters"]:
+                  if not isinstance(c, dict) or not str(c.get("name", "")).strip() or not str(c.get("role", "")).strip() or not str(c.get("visual_identity", "")).strip():
+                      return "Every character needs name, role, and visual identity."
+              return None
 
+
+          def premise_prompt(attempt):
               return f"""
-          Generate FOUR TO SIX radically different, compact premises for one original faceless YouTube Short.
-          Return genuinely distinct story families; do not produce four versions of the same
-          workplace repair, deadline, records discrepancy, equipment failure, or safety scenario.
-          This is candidate {attempt}. The final channel goal is high-quality human micro-drama,
-          not motivational poetry and not a morality fable.
+          Generate exactly THREE SHORT, radically different premise options for one original faceless YouTube Short. Return ONLY one JSON object with a `premises` array.
 
-          Use these as loose starting constraints only:
-          Domain: {domain}
-          Possible setting: {setting}
-          Possible relationship: {relationship}
-          Possible mechanism: {mechanism}
-          Primary emotion: {emotion}
+          Each premise object MUST have exactly these fields:
+          - title: short title seed
+          - protagonist: adult name
+          - age: integer 21-70
+          - role: concrete adult role/skill
+          - goal: concrete thing they must accomplish today
+          - relationship: meaningful adult relationship
+          - conflict: practical external conflict
+          - choice: two plausible options with different real downsides
+          - consequence: concrete lasting result after the choice
+          - visual: one plot-essential visual motif
+          - why_fresh: one sentence explaining why the premise is not a common AI short
 
-          RECENT CHANNEL HISTORY:
+          Keep EACH premise compact. Do not repeat the same family of plot three times.
+          At least two premises must be relationship-driven, not machine/deadline driven.
+          No child danger, illness, hospitals, magic, miracles, benefactors, hidden fortunes, romance as the main engine, honesty-vs-lying, parent-vs-work, money-returning, elevator, blackout, concert, audition, train platform, coffee shop, ticking-clock, glowing object, red ribbon, sentimental found-object, bonus, promotion, applause, thank-you note, or stranger-saves-the-day plots.
+          Do not use a generic repair job, data-integrity-vs-speed dilemma, or simple work-process puzzle.
+
+          Domain seed: {rng.choice(DOMAINS)}
+          Setting seed: {rng.choice(SETTINGS)}
+          Emotion seed: {rng.choice(EMOTIONS)}
+          Recent channel history:
           {recent_text}
 
-          Each premise must:
-          - have one specific adult protagonist with a real name, age, and concrete role or skill;
-          - have an immediate practical goal happening today;
-          - have a concrete external problem;
-          - give at least two plausible options, both with believable downsides;
-          - create a lasting consequence that is NOT a reward;
-          - use one plot-essential visual motif;
-          - derive emotion from a real adult relationship, action, cost and consequence;
-          - work completely without identifiable faces;
-          - be physically and institutionally believable;
-          - avoid romance as the central engine;
-          - include a meaningful adult-to-adult relationship that changes how the decision feels;
-          - avoid child danger, illness, hospitals, magic, miracles, benefactors, hidden fortunes,
-            coincidence-based rescues, work-vs-child, lie-vs-truth, delivery-driver honesty,
-            coffee-shop dilemmas, train-platform dilemmas, elevator/blackout stories,
-            concert/audition stories, ticking clocks, glowing-object symbolism, red ribbons,
-            sentimental found-object twists, surprise promotions, bonuses, applause endings,
-            and "ordinary worker helps someone and gets rewarded" structures.
-
-          IMPORTANT: these should feel like plots a good live-action short film could actually shoot.
-          At least two premises must use a relationship-driven conflict rather than a machine,
-          deadline, inventory, or data-integrity problem. At least one premise must involve a
-          personal history or prior mistake that changes a practical present-day decision without
-          becoming a sentimental-object reveal. Never use "data integrity vs speed" as the core dilemma.
-          Avoid symbolic-object stories where an object exists mainly to trigger a memory.
-          Avoid emergencies that exist only to manufacture tension.
-          Avoid a protagonist being morally "tested" by an obviously virtuous choice.
-
-          Score each premise honestly for freshness. Do NOT include a selected_index field.
-          Return only the premise array; Python will deterministically select the strongest eligible premise.
+          Return only:
+          {{"premises":[{{...}},{{...}},{{...}}]}}
           """
 
 
-          def make_story_prompt(premise):
+          def story_prompt(p):
               return f"""
-          Write one publication-ready emotional micro-story for a faceless vertical YouTube Short.
-          Use EXACTLY this selected premise as the structural foundation. Do not replace it with
-          a safer generic workplace story.
+          Write ONE publication-ready emotional micro-story for a faceless vertical YouTube Short using EXACTLY this premise as the foundation.
 
           SELECTED PREMISE:
-          {json.dumps(premise, ensure_ascii=False)}
+          {json.dumps(p, ensure_ascii=False)}
 
-          RECENT CHANNEL HISTORY:
-          {recent_text}
+          Return ONLY one JSON object with these fields:
+          title, hook, setting, protagonist, desire, stakes, obstacle, choice, cost, consequence, turning_point, payoff, description, characters, scenes.
+          The protagonist object must contain name, age, role, visual_identity.
+          Each character must contain name, role, visual_identity.
+          Each scene must contain scene number and narration.
 
-          STORY DESIGN:
-          1. Start inside a specific action that creates an unanswered practical question.
-          2. Establish the adult protagonist, their existing relationship to at least one other adult,
-             and concrete goal immediately.
-          3. Escalate through physical/logistical/interpersonal cause and effect.
-          4. Give at least two plausible options with different real downsides; neither should be
-             simply "wait or do it now" or "tell the truth or lie".
-          5. Make the decision produce a cost that remains real afterward.
-          6. Make the turning point depend on a fact, skill, relationship detail, constraint or earlier action already planted.
-          7. End with a believable changed situation, not a reward parade.
-          8. Let emotion come from what happened, not from speeches.
-          9. Keep every scene necessary.
-          10. The story must work with faces never shown.
-          11. Fill every narrative field in the JSON, especially consequence: state the concrete
-              result caused by the choice and what remains different afterward.
+          Story rules:
+          - 9-11 scenes.
+          - 170-220 narration words preferred; absolute 150-260.
+          - Every scene 12-26 spoken words.
+          - Specific adult protagonist and adult relationship.
+          - Concrete goal today.
+          - Real external conflict with two plausible options.
+          - Persistent cost after the decision.
+          - Turning point must use something established earlier.
+          - Ending must change the situation without a perfect reward.
+          - Emotion comes from action, consequence, relationship, body language and sound; never facial expressions.
+          - Fully faceless-filmable.
+          - No motivational speech.
+          - No magic, coincidence, child danger, illness, hospitals, benefactors, hidden fortune, romance as central engine, honesty-vs-lying, parent-vs-work, money-returning, elevator, blackout, concert, audition, train platform, coffee shop, ticking clock, glowing object, red ribbon, sentimental found-object, bonus, promotion, applause, thank-you note, or random stranger solving the plot.
+          - Do not turn this into a maintenance manual or generic office puzzle.
 
-          WORD/SCALE CONTRACT:
-          - 9-11 scenes exactly.
-          - Every scene 14-28 spoken words when possible.
-          - Total narration target 165-220 words.
-          - Absolute accepted range 135-250 words.
-          - The last scene must resolve the central problem without making life perfect.
-
-          DO NOT USE:
-          child rescue, illness, hospital reveals, supernatural elements, miracles, destiny,
-          secret benefactors, lottery/fortune, blackouts, elevators, concert halls, auditions,
-          train platforms, coffee shops, parent-vs-work, lie-vs-truth, money-returning dilemmas,
-          instant promotions, bonuses, applause, thank-you notes, random strangers solving the plot,
-          red ribbons, glowing objects, ticking clocks, sentimental hidden messages, or generic
-          motivational language.
-
-          The story should contain a human relationship, concrete personal stake, and an earned
-          emotional shift caused by what the protagonist actually does. Avoid stories that feel like
-          maintenance manuals or office process puzzles.
-
-          Return ONLY JSON matching the supplied schema.
+          Before returning, verify internally that every requested field exists and that `consequence` is explicit and concrete.
           """
 
 
-          def make_length_repair_prompt(story):
-              current = word_count(story)
+          def repair_prompt(story, issue):
               return f"""
-          Repair ONLY the narration length of this otherwise valid story.
+          Repair this existing story because of ONE validation problem: {issue}
 
-          CURRENT WORD COUNT: {current}
-          REQUIRED WORD COUNT: {MIN_WORDS}-{MAX_WORDS}
-          TARGET: 170-220 spoken words.
-
-          PRESERVE EXACTLY:
-          - title and premise
-          - protagonist name, age and role
-          - setting
-          - desire, stakes and obstacle
-          - choice, cost and consequence
-          - turning point and payoff
-          - the same central mechanism
-
-          Do not add a subplot, moral speech, coincidence, miracle, child danger, illness,
-          benefactor, reward, promotion, bonus, applause, thank-you note, coffee-shop,
-          train-platform, elevator, blackout, concert, ticking-clock, or sentimental-object plot.
-          Add only concrete action, reaction, transition and necessary cause-and-effect detail.
-          Keep 9-11 scenes and faceless filmability.
-          Every scene should contain 14-26 spoken words where practical.
-          The final total MUST be at least {MIN_WORDS} words; aim for 175-210 rather than barely
-          crossing the minimum.
-          Before returning, scan the rewritten story against every banned pattern and phrase in
-          the system prompt. If the draft would contain any banned pattern, rewrite that sentence
-          again without the banned concept. Never introduce a new plot device during length repair.
-          Return ONLY corrected story JSON.
+          Return ONLY the same JSON object with all original story fields preserved.
+          Change only what is necessary to fix the validation problem. Do not replace the premise, relationship, setting, or central mechanism.
+          Do not introduce any banned plot pattern. Keep 9-11 scenes and 150-260 words.
 
           STORY:
           {json.dumps(story, ensure_ascii=False)}
           """
 
-          def make_field_repair_prompt(story, field, reason):
+
+          def critic_prompt(story):
               return f"""
-          Make one minimal structural correction to the story below.
+          Ruthlessly review this faceless YouTube Short as a senior short-film editor.
+          Return ONLY JSON with:
+          pass, hook_score, originality_score, believability_score, emotional_score, conflict_score, ending_score, visual_score, issues.
+          Scores are integers 0-10. `pass` MUST be true only when every score is >=7.
 
-          FAILED FIELD: {field}
-          REASON: {reason}
-
-          Rewrite only what is necessary to make this field concrete, specific and useful to the
-          existing plot. Preserve the protagonist, central mechanism, choice, cost, consequence,
-          turning point, payoff and scene sequence unless a tiny consistency edit is unavoidable.
-          For desire: state exactly what the protagonist must accomplish TODAY and what concrete
-          outcome they need.
-          For consequence: state exactly what changes because of the choice, including a concrete
-          result that remains true after the immediate action is finished. It must be observable, not a vague feeling such as "to make things right",
-          "to prove themselves", "to help", or "to fix the situation".
-          Do not add a subplot, reward ending, moral speech, coincidence, magic, child danger,
-          illness, benefactor, bonus, promotion, or sentimental-object reveal.
-          Return ONLY corrected story JSON.
+          Reject generic AI stories, generic worker-helping-someone stories, reward endings, moral tests, fake urgency, easy phone-call conflicts, coincidence, sentimental objects, and plots that need facial expressions.
+          Judge emotion from action, cost, relationship, body language, sound, and consequence.
 
           STORY:
           {json.dumps(story, ensure_ascii=False)}
           """
 
-          def make_banned_cleanup_prompt(story, issue):
-              return f"""
-          Remove ONLY the banned pattern from this otherwise usable story.
 
-          VALIDATION ISSUE: {issue}
+          def normalize_critic(c):
+              keys = ["hook_score","originality_score","believability_score","emotional_score","conflict_score","ending_score","visual_score"]
+              scores = [c.get(k, -1) for k in keys]
+              ok = all(isinstance(x, int) and not isinstance(x, bool) and 0 <= x <= 10 for x in scores)
+              avg = round(sum(scores)/len(scores), 2) if ok else 0.0
+              deterministic = ok and all(x >= 7 for x in scores)
+              out = dict(c) if isinstance(c, dict) else {}
+              out["pass"] = deterministic
+              out["score_average"] = avg
+              out["all_axes_at_least_7"] = ok and all(x >= 7 for x in scores)
+              out["model_pass"] = bool(c.get("pass")) if isinstance(c, dict) else False
+              out["issues"] = list(c.get("issues") or []) if isinstance(c, dict) else ["Critic response was not an object."]
+              if out["model_pass"] != deterministic:
+                  out["issues"].append("Critic boolean ignored when inconsistent with numeric scores.")
+              return out
 
-          Preserve the protagonist, setting, central problem, choice, cost, consequence,
-          turning point, payoff and scene order. Replace only the offending wording or beat
-          with a concrete, realistic action that serves the SAME plot purpose. Do not introduce
-          any new subplot, symbol, emergency, reward, coincidence, or new relationship.
-          Keep 9-11 scenes and 170-220 target words.
-          Return ONLY corrected story JSON.
-
-          STORY:
-          {json.dumps(story, ensure_ascii=False)}
-          """
-
-          def make_critic_prompt(story):
-              return f"""
-          Ruthlessly review this story as a senior short-film editor.
-
-          STORY:
-          {json.dumps(story, ensure_ascii=False)}
-
-          Score 0-10 for:
-          hook, originality, believability, emotional impact, conflict, ending, visual potential.
-
-          PASS ONLY IF every score is >= 7 and average >= 6.8.
-
-          REJECT aggressively when:
-          - the premise is just a worker helping someone and being rewarded;
-          - the story is a moral test with one obviously virtuous option;
-          - the conflict could disappear with an obvious practical phone call or simple compromise;
-          - the emotional beat depends on a sentimental object or a child/illness shortcut;
-          - the ending rewards the protagonist instead of changing the situation;
-          - an emergency is used as artificial drama;
-          - the plot relies on coincidence;
-          - the story feels interchangeable with a generic AI short;
-          - the visual motif is decorative rather than plot-essential;
-          - the faceless format is undermined by needing facial expressions.
-
-          Be strict but fair. The system uses the numeric scores, not your boolean, as the gate.
-          For every score below 7, name the exact structural defect.
-          Return ONLY critic JSON.
-          """
-
-
-          def make_repair_prompt(story, critique):
-              return f"""
-          Rebuild this failed story into a genuinely stronger short film.
-
-          CURRENT STORY:
-          {json.dumps(story, ensure_ascii=False)}
-
-          CRITIC:
-          {json.dumps(critique, ensure_ascii=False)}
-
-          Do NOT polish the wording. Replace the weak causal structure where necessary.
-          At least three of these must materially change if the critic identifies them as weak:
-          central mechanism, choice, consequence, visual motif, escalation, ending.
-
-          Keep the protagonist specific and preserve what is genuinely working.
-          No magic, coincidence, child danger, illness, hospitals, benefactors, bonuses,
-          promotions, applause, thank-you-note endings, parent-vs-work, lie-vs-truth,
-          coffee-shop, train-platform, elevator, blackout, concert or ticking-clock plots.
-
-          Return ONLY corrected story JSON. Use 9-11 scenes, 14-28 spoken words per scene,
-          170-220 target total words, absolute 150-250 words.
-          """
-
-
-          # ------------------------------------------------------------------
-          # Main bounded quality search
-          # ------------------------------------------------------------------
           approved_story = None
           approved_report = None
-          rejection_log = []
+          rejections = []
 
           for attempt in range(1, MAX_STORY_ATTEMPTS + 1):
               print("=" * 60)
               print(f"STORY CANDIDATE {attempt}/{MAX_STORY_ATTEMPTS}")
               print("=" * 60)
-
               try:
-                  premise_pack = call_groq(
-                      make_premise_prompt(attempt), PREMISE_SCHEMA,
-                      temperature=0.84, max_tokens=3000
-                  )
-                  premises = premise_pack.get("premises", [])
-                  if len(premises) < 3:
-                      raise ValueError("Premise generator returned fewer than 3 premises.")
-
-                  # The model no longer selects the winner. Deterministically choose the
-                  # strongest eligible premise in Python so a malformed/missing selector
-                  # can never produce another schema failure or arbitrary choice.
-                  eligible = []
-                  for idx, item in enumerate(premises):
-                      premise_text = json.dumps(item, ensure_ascii=False).lower()
-                      banned = next((term for term in BANNED_PATTERNS if term in premise_text), None)
-                      if banned:
-                          print(f"PREMISE {idx + 1} REJECTED — banned pattern: {banned}")
-                          continue
-                      generic_engine_terms = (
-                          "data integrity vs speed", "manual versus machine",
-                          "wait or do it now", "fix it before the game",
-                          "repair it before the event", "deadline vs quality"
-                      )
-                      if any(term in premise_text for term in generic_engine_terms):
-                          print(f"PREMISE {idx + 1} REJECTED — generic procedural engine")
-                          continue
-                      required_keys = [
-                          "title_seed", "protagonist_name", "protagonist_age", "protagonist_role",
-                          "setting", "immediate_goal", "mechanism", "choice", "cost",
-                          "lasting_consequence", "visual_motif", "why_fresh", "score",
-                      ]
-                      if any(not str(item.get(k, "")).strip() for k in required_keys):
-                          print(f"PREMISE {idx + 1} REJECTED — incomplete fields")
-                          continue
-                      if not (21 <= int(item.get("protagonist_age", 0)) <= 70):
-                          continue
-                      if len(str(item.get("why_fresh", "")).split()) < 8:
-                          continue
-                      eligible.append((int(item.get("score", 0)), idx, item))
-
-                  if not eligible:
-                      fallback = []
-                      for idx, item in enumerate(premises):
-                          required_keys = [
-                              "title_seed", "protagonist_name", "protagonist_age", "protagonist_role",
-                              "setting", "immediate_goal", "mechanism", "choice", "cost",
-                              "lasting_consequence", "visual_motif", "why_fresh", "score",
-                          ]
-                          if any(not str(item.get(k, "")).strip() for k in required_keys):
-                              continue
-                          try:
-                              age = int(item.get("protagonist_age", 0))
-                              score = int(item.get("score", 0))
-                          except (TypeError, ValueError):
-                              continue
-                          if 21 <= age <= 70:
-                              fallback.append((score, idx, item))
-                      if not fallback:
-                          raise ValueError("Premise generator produced no structurally complete premise.")
-                      print("PREMISE FILTER FALLBACK — all candidates hit soft novelty filters; using strongest structurally complete premise.")
-                      eligible = fallback
-
-                  eligible.sort(key=lambda x: (x[0], -x[1]), reverse=True)
-                  premise_score, premise_index, premise = eligible[0]
-                  print(f"SELECTED PREMISE {premise_index + 1}/{len(premises)} — score={premise_score}")
-
-                  candidate = normalize_story_object(call_groq(
-                      make_story_prompt(premise), STORY_SCHEMA,
-                      temperature=0.68, max_tokens=3300
-                  ))
-
-                  local_issue = local_story_check(candidate)
-                  if local_issue and local_issue.startswith("Story is too short"):
-                      print("CANDIDATE LENGTH CHECK:", local_issue)
-                      print("RUNNING BOUNDED TARGETED LENGTH REPAIR")
-                      for length_pass in range(1, 3):
-                          repaired_length = call_groq(
-                              make_length_repair_prompt(candidate), STORY_SCHEMA,
-                              temperature=0.38 if length_pass == 1 else 0.30,
-                              max_tokens=3000
-                          )
-                          candidate = normalize_story_object(repaired_length)
-                          local_issue = local_story_check(candidate)
-                          if not local_issue:
-                              print(f"LENGTH REPAIR PASSED ON PASS {length_pass}")
-                              break
-                          print(f"LENGTH REPAIR PASS {length_pass} RESULT:", local_issue)
-
-                  if local_issue:
-                      field_match = re.match(r"([a-z_]+) is too vague\.$", local_issue)
-                      if field_match:
-                          field_name = field_match.group(1)
-                          if field_name in NARRATIVE_FIELDS:
-                              print("CANDIDATE FIELD CHECK:", local_issue)
-                              print(f"RUNNING ONE TARGETED {field_name.upper()} REPAIR")
-                              repaired_field = call_groq(
-                                  make_field_repair_prompt(candidate, field_name, local_issue), STORY_SCHEMA,
-                                  temperature=0.34, max_tokens=3000
-                              )
-                              candidate = normalize_story_object(repaired_field)
-                              local_issue = local_story_check(candidate)
-                              if not local_issue:
-                                  print(f"{field_name.upper()} REPAIR PASSED — CONTINUING")
-                              else:
-                                  print(f"{field_name.upper()}-REPAIRED CANDIDATE LOCAL CHECK:", local_issue)
-
-                  # Length repair can accidentally introduce a banned phrase/pattern.
-                  # When that happens, clean the offending concept once rather than discarding
-                  # an otherwise viable candidate.
-                  if local_issue and (
-                      local_issue.startswith("Banned story pattern detected:")
-                      or local_issue.startswith("Cliche detected:")
-                      or local_issue.startswith("Convenient reward ending detected:")
-                  ):
-                      print("CANDIDATE CONTENT CHECK:", local_issue)
-                      print("RUNNING ONE TARGETED CONTENT CLEANUP")
-                      cleaned = call_groq(
-                          make_banned_cleanup_prompt(candidate, local_issue), STORY_SCHEMA,
-                          temperature=0.25, max_tokens=3000
-                      )
-                      candidate = normalize_story_object(cleaned)
-                      local_issue = local_story_check(candidate)
-                      if not local_issue:
-                          print("CONTENT CLEANUP PASSED — CONTINUING TO QUALITY REVIEW")
+                  pack = call_groq(premise_prompt(attempt), temperature=0.82, max_tokens=2200)
+                  premises = pack.get("premises", []) if isinstance(pack, dict) else []
+                  if not isinstance(premises, list):
+                      raise RuntimeError("Premise response did not contain a premises array.")
+                  valid = []
+                  for i, p in enumerate(premises[:6]):
+                      issue = premise_issue(p)
+                      if not issue:
+                          valid.append(p)
                       else:
-                          print("CONTENT-CLEANED CANDIDATE LOCAL CHECK:", local_issue)
+                          print(f"PREMISE {i+1} REJECTED: {issue}")
+                  if not valid:
+                      raise RuntimeError("No valid premise was returned by the premise generator.")
+                  # Use model's numeric freshness score only after Python validation.
+                  valid.sort(key=lambda x: int(x.get("score", 0)), reverse=True)
+                  selected = valid[0]
+                  print(f"SELECTED PREMISE — score={selected.get('score', 0)}")
 
-                  if local_issue:
-                      print("CANDIDATE LOCAL CHECK:", local_issue)
-                      rejection_log.append({"attempt": attempt, "stage": "local", "issues": [local_issue]})
+                  candidate = call_groq(story_prompt(selected), temperature=0.64, max_tokens=4000)
+                  issue = story_issue(candidate)
+                  if issue:
+                      print("CANDIDATE LOCAL CHECK:", issue)
+                      if issue.startswith("Story is too short") or issue.endswith("too vague.") or issue.startswith("Hook is too short") or issue.startswith("Missing story field:"):
+                          repaired = call_groq(repair_prompt(candidate, issue), temperature=0.32, max_tokens=4000)
+                          candidate = repaired
+                          issue = story_issue(candidate)
+                          print("REPAIR RESULT:", issue or "PASS")
+                  if issue:
+                      rejections.append({"attempt": attempt, "stage": "local", "issue": issue})
                       continue
 
-                  critique = normalize_critique(call_groq(
-                      make_critic_prompt(candidate), CRITIC_SCHEMA,
-                      temperature=0.10, max_tokens=1000
-                  ))
-                  print("=" * 60)
-                  print(f"QUALITY REVIEW FOR CANDIDATE {attempt}")
-                  print("=" * 60)
+                  critique = normalize_critic(call_groq(critic_prompt(candidate), temperature=0.10, max_tokens=1200))
                   print(json.dumps(critique, ensure_ascii=False, indent=2))
                   print(f"Deterministic quality result: pass={critique['pass']} average={critique['score_average']:.2f}")
-
                   if critique["pass"]:
-                      approved_story = candidate
-                      approved_report = critique
+                      approved_story, approved_report = candidate, critique
                       break
 
-                  rejection_log.append({
-                      "attempt": attempt,
-                      "stage": "quality",
-                      "score_average": critique["score_average"],
-                      "issues": critique.get("issues", []),
-                  })
+                  rejections.append({"attempt": attempt, "stage": "quality", "score_average": critique["score_average"], "issues": critique["issues"]})
 
-                  # Repair only a reasonably viable candidate. Very weak candidates are
-                  # replaced by the next independently generated premise.
-                  if critique["score_average"] >= 4.5:
-                      print("CANDIDATE FAILED — RUNNING ONE STRUCTURAL REPAIR")
-                      repaired = normalize_story_object(call_groq(
-                          make_repair_prompt(candidate, critique), STORY_SCHEMA,
-                          temperature=0.58, max_tokens=3300
-                      ))
+                  # One full structural repair only for candidates close enough to be worth salvaging.
+                  if critique["score_average"] >= 5.5:
+                      repair = call_groq(
+                          f"""
+          Rebuild this story into a stronger, more original faceless short.
+          Do not merely polish wording. Change the weak causal structure identified by the critic.
+          Keep the same named protagonist only if useful; otherwise replace the premise entirely.
+          The replacement must have an adult relationship, concrete present-day goal, two legitimate options,
+          persistent cost, earned turning point, imperfect payoff, and a distinctive plot-essential visual detail.
+          No banned pattern from the story rules.
+          Return the complete JSON story object with all required fields.
 
-                      repaired_issue = local_story_check(repaired)
-                      if repaired_issue and repaired_issue.startswith("Story is too short"):
-                          print("REPAIRED STORY TOO SHORT — RUNNING BOUNDED LENGTH REPAIR")
-                          for length_pass in range(1, 3):
-                              repaired = normalize_story_object(call_groq(
-                                  make_length_repair_prompt(repaired), STORY_SCHEMA,
-                                  temperature=0.36 if length_pass == 1 else 0.28,
-                                  max_tokens=3000
-                              ))
-                              repaired_issue = local_story_check(repaired)
-                              if not repaired_issue:
-                                  print(f"REPAIRED LENGTH PASSED ON PASS {length_pass}")
-                                  break
-                              print(f"REPAIRED LENGTH PASS {length_pass} RESULT:", repaired_issue)
+          CRITIC:
+          {json.dumps(critique, ensure_ascii=False)}
 
-                      if repaired_issue and (
-                          repaired_issue.startswith("Banned story pattern detected:")
-                          or repaired_issue.startswith("Cliche detected:")
-                          or repaired_issue.startswith("Convenient reward ending detected:")
-                      ):
-                          print("REPAIRED CONTENT CHECK:", repaired_issue)
-                          print("RUNNING ONE TARGETED REPAIR CONTENT CLEANUP")
-                          repaired = normalize_story_object(call_groq(
-                              make_banned_cleanup_prompt(repaired, repaired_issue), STORY_SCHEMA,
-                              temperature=0.24, max_tokens=3000
-                          ))
-                          repaired_issue = local_story_check(repaired)
-
-                      if repaired_issue:
-                          print("REPAIRED CANDIDATE LOCAL CHECK:", repaired_issue)
-                          rejection_log.append({
-                              "attempt": attempt,
-                              "stage": "local_after_repair",
-                              "issues": [repaired_issue],
-                          })
-                      else:
-                          repair_critique = normalize_critique(call_groq(
-                              make_critic_prompt(repaired), CRITIC_SCHEMA,
-                              temperature=0.10, max_tokens=1000
-                          ))
-                          print("=" * 60)
-                          print(f"QUALITY REVIEW AFTER REPAIR FOR CANDIDATE {attempt}")
-                          print("=" * 60)
-                          print(json.dumps(repair_critique, ensure_ascii=False, indent=2))
-                          print(
-                              f"Deterministic quality result after repair: "
-                              f"pass={repair_critique['pass']} average={repair_critique['score_average']:.2f}"
-                          )
+          STORY:
+          {json.dumps(candidate, ensure_ascii=False)}
+          """,
+                          temperature=0.55,
+                          max_tokens=4000,
+                      )
+                      repair_issue = story_issue(repair)
+                      if not repair_issue:
+                          repair_critique = normalize_critic(call_groq(critic_prompt(repair), temperature=0.10, max_tokens=1200))
+                          print("REPAIR QUALITY:", json.dumps(repair_critique, ensure_ascii=False))
                           if repair_critique["pass"]:
-                              approved_story = repaired
-                              approved_report = repair_critique
+                              approved_story, approved_report = repair, repair_critique
                               break
-                          rejection_log.append({
-                              "attempt": attempt,
-                              "stage": "quality_after_repair",
-                              "score_average": repair_critique["score_average"],
-                              "issues": repair_critique.get("issues", []),
-                          })
-
-                  print("CANDIDATE REJECTED — GENERATING A FRESH PREMISE")
-
+                          rejections.append({"attempt": attempt, "stage": "quality_after_repair", "score_average": repair_critique["score_average"], "issues": repair_critique["issues"]})
+                      else:
+                          rejections.append({"attempt": attempt, "stage": "local_after_repair", "issue": repair_issue})
               except Exception as exc:
                   print("CANDIDATE FAILED:", exc)
-                  rejection_log.append({"attempt": attempt, "stage": "generation", "issues": [str(exc)]})
+                  rejections.append({"attempt": attempt, "stage": "generation", "issue": str(exc)})
                   continue
 
           if approved_story is None:
               raise RuntimeError(
-                  "No publication-ready story passed all deterministic gates. "
-                  f"Nothing will be published. API calls used: {api_calls}. "
-                  f"Diagnostics: {json.dumps(rejection_log, ensure_ascii=False)[:9000]}"
+                  "No publication-ready story passed all deterministic gates. Nothing will be published. "
+                  f"API calls used: {api_calls}. Diagnostics: {json.dumps(rejections, ensure_ascii=False)[:9000]}"
               )
 
-          # ------------------------------------------------------------------
-          # Final pre-publication revalidation. No state from rejected candidates is used.
-          # ------------------------------------------------------------------
-          final_issue = local_story_check(approved_story)
+          final_issue = story_issue(approved_story)
           if final_issue:
-              raise RuntimeError(f"Approved story failed final local revalidation: {final_issue}")
+              raise RuntimeError(f"Approved story failed final revalidation: {final_issue}")
           if not approved_report or not approved_report.get("pass"):
-              raise RuntimeError("Approved story lost its deterministic quality pass before publication.")
+              raise RuntimeError("Approved story lost its deterministic quality pass.")
 
           OUTPUT_DIR.mkdir(parents=True, exist_ok=True)
-
           words = word_count(approved_story)
           duration = max(MIN_DURATION, min(MAX_DURATION, round(words / WPM * 60)))
-          scene_count = len(approved_story["scenes"])
-
           production_scenes = []
           for scene in approved_story["scenes"]:
-              scene_words = len(scene["narration"].split())
-              seconds = max(3, round(scene_words / WPM * 60))
+              sw = len(scene["narration"].split())
               production_scenes.append({
                   "scene": scene["scene"],
-                  "duration_seconds": seconds,
+                  "duration_seconds": max(3, round(sw / WPM * 60)),
                   "narration": scene["narration"],
                   "visual_prompt": (
-                      "Production-ready faceless cinematic vertical shot matching this exact narration: "
-                      + scene["narration"]
-                      + ". No identifiable face. Use hands, backs, silhouettes, body language, tools, "
-                        "objects, reflections and environmental framing. Keep exact continuity of clothing, "
-                        "props, location, season and time. Natural physically plausible action, realistic "
-                        "materials and lighting, strong composition, 9:16."
+                      "Faceless cinematic vertical shot matching this exact narration: " + scene["narration"] +
+                      ". No identifiable face. Use hands, backs, silhouettes, body language, tools, objects, "
+                      "reflections and environment. Physically plausible action, continuity of clothing/props/location, "
+                      "natural lighting, realistic materials, strong composition, 9:16."
                   ),
-                  "camera": "subtle physically plausible camera movement motivated by the visible action",
+                  "camera": "subtle physically plausible camera movement motivated by visible action",
                   "on_screen_text": "",
-                  "sfx": "natural location sound synchronized to the visible action",
+                  "sfx": "natural location sound synchronized to visible action",
               })
 
-          premise_summary = (
-              f"{approved_story['protagonist']['name']}, "
-              f"{approved_story['protagonist']['role']}; "
-              f"{approved_story['desire']}"
-          )
-
-          (OUTPUT_DIR / "story.json").write_text(
-              json.dumps(approved_story, ensure_ascii=False, indent=2), encoding="utf-8"
-          )
-          (OUTPUT_DIR / "quality_report.json").write_text(
-              json.dumps(approved_report, ensure_ascii=False, indent=2), encoding="utf-8"
-          )
-          (OUTPUT_DIR / "scenes.json").write_text(
-              json.dumps({"duration_seconds": duration, "scenes": production_scenes}, ensure_ascii=False, indent=2),
-              encoding="utf-8",
-          )
+          premise_summary = f"{approved_story['protagonist']['name']}, {approved_story['protagonist']['role']}; {approved_story['desire']}"
+          (OUTPUT_DIR / "story.json").write_text(json.dumps(approved_story, ensure_ascii=False, indent=2), encoding="utf-8")
+          (OUTPUT_DIR / "quality_report.json").write_text(json.dumps(approved_report, ensure_ascii=False, indent=2), encoding="utf-8")
+          (OUTPUT_DIR / "scenes.json").write_text(json.dumps({"duration_seconds": duration, "scenes": production_scenes}, ensure_ascii=False, indent=2), encoding="utf-8")
           (OUTPUT_DIR / "title.txt").write_text(approved_story["title"] + "\n", encoding="utf-8")
-          (OUTPUT_DIR / "script.txt").write_text(
-              "\n".join(scene["narration"] for scene in approved_story["scenes"]) + "\n",
-              encoding="utf-8",
-          )
-          (OUTPUT_DIR / "description.txt").write_text(
-              approved_story["description"] + "\n", encoding="utf-8"
-          )
+          (OUTPUT_DIR / "script.txt").write_text("\n".join(s["narration"] for s in approved_story["scenes"]) + "\n", encoding="utf-8")
+          (OUTPUT_DIR / "description.txt").write_text(approved_story["description"] + "\n", encoding="utf-8")
 
           history.append({
               "title": approved_story["title"],
@@ -1177,9 +585,7 @@ jobs:
               "passed_deterministic_gate": True,
           })
           HISTORY_FILE.parent.mkdir(parents=True, exist_ok=True)
-          HISTORY_FILE.write_text(
-              json.dumps(history[-40:], ensure_ascii=False, indent=2), encoding="utf-8"
-          )
+          HISTORY_FILE.write_text(json.dumps(history[-40:], ensure_ascii=False, indent=2), encoding="utf-8")
 
           print("=" * 60)
           print("PUBLICATION-READY STORY APPROVED")
@@ -1187,7 +593,7 @@ jobs:
           print("Title:", approved_story["title"])
           print("Words:", words)
           print("Estimated duration:", duration, "seconds")
-          print("Scenes:", scene_count)
+          print("Scenes:", len(approved_story["scenes"]))
           print("Quality average:", approved_report["score_average"])
           print("API calls used:", api_calls)
           print("DETERMINISTIC PUBLICATION GATE: PASS")
