@@ -654,7 +654,7 @@ jobs:
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
                       prompt,
-                      max_tokens=2200,
+                      max_tokens=1900,
                       temperature=0.65,
                       label=f"story-{call_number}",
                       response_schema=STORY_SCHEMA,
@@ -711,7 +711,7 @@ jobs:
 
                   story = groq_json(
                       repair_prompt,
-                      max_tokens=2000,
+                      max_tokens=1800,
                       temperature=0.25,
                       label=f"repair-{call_number}",
                       response_schema=STORY_SCHEMA,
