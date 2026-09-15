@@ -268,10 +268,10 @@ jobs:
               "additionalProperties": False,
           }
 
-          # Keep Groq schema intentionally tolerant on narrative summary fields.
-          # GPT-OSS can occasionally omit one field even when prompted correctly; missing
-          # narrative fields are repaired/validated deterministically after JSON parsing
-          # instead of causing a hard Groq HTTP 400.
+          # Groq strict JSON Schema requires every declared property to appear in
+          # the top-level required array. Keep the schema contract explicit; any
+          # content-quality weakness is handled by Python validation/repair after
+          # a structurally valid response is received.
           STORY_SCHEMA = {
               "type": "object",
               "properties": {
@@ -328,7 +328,11 @@ jobs:
                       },
                   },
               },
-              "required": ["title", "hook", "setting", "protagonist", "scenes"],
+              "required": [
+                  "title", "hook", "setting", "protagonist", "desire", "stakes",
+                  "obstacle", "choice", "cost", "consequence", "turning_point",
+                  "payoff", "description", "characters", "scenes"
+              ],
               "additionalProperties": False,
           }
 
@@ -351,6 +355,32 @@ jobs:
               ],
               "additionalProperties": False,
           }
+
+          def validate_strict_schema_contract(schema, label):
+              if schema.get("type") != "object":
+                  raise RuntimeError(f"{label}: root schema must be an object.")
+              props = schema.get("properties", {})
+              required = schema.get("required")
+              if not isinstance(required, list):
+                  raise RuntimeError(f"{label}: required must be an array.")
+              missing = sorted(set(props) - set(required))
+              if missing:
+                  raise RuntimeError(
+                      f"{label}: Groq strict schema is invalid; missing required properties: {missing}"
+                  )
+              if len(required) != len(set(required)):
+                  raise RuntimeError(f"{label}: required contains duplicates.")
+              for key, value in props.items():
+                  if value.get("type") == "object":
+                      validate_strict_schema_contract(value, f"{label}.{key}")
+                  elif value.get("type") == "array":
+                      item_schema = value.get("items")
+                      if isinstance(item_schema, dict) and item_schema.get("type") == "object":
+                          validate_strict_schema_contract(item_schema, f"{label}.{key}[]")
+
+          validate_strict_schema_contract(PREMISE_SCHEMA, "PREMISE_SCHEMA")
+          validate_strict_schema_contract(STORY_SCHEMA, "STORY_SCHEMA")
+          validate_strict_schema_contract(CRITIC_SCHEMA, "CRITIC_SCHEMA")
 
           history = []
           try:
@@ -400,6 +430,8 @@ jobs:
 
 
           def call_groq(prompt, schema, temperature=0.6, max_tokens=3000):
+              # Defensive preflight: never send an invalid strict schema to Groq.
+              validate_strict_schema_contract(schema, "response_format")
               global api_calls, last_call_started
               if api_calls >= MAX_API_CALLS:
                   raise RuntimeError("Internal API-call budget exhausted before publication-ready story was found.")
@@ -879,7 +911,26 @@ jobs:
                       eligible.append((int(item.get("score", 0)), idx, item))
 
                   if not eligible:
-                      raise ValueError("Premise generator produced no eligible premise.")
+                      fallback = []
+                      for idx, item in enumerate(premises):
+                          required_keys = [
+                              "title_seed", "protagonist_name", "protagonist_age", "protagonist_role",
+                              "setting", "immediate_goal", "mechanism", "choice", "cost",
+                              "lasting_consequence", "visual_motif", "why_fresh", "score",
+                          ]
+                          if any(not str(item.get(k, "")).strip() for k in required_keys):
+                              continue
+                          try:
+                              age = int(item.get("protagonist_age", 0))
+                              score = int(item.get("score", 0))
+                          except (TypeError, ValueError):
+                              continue
+                          if 21 <= age <= 70:
+                              fallback.append((score, idx, item))
+                      if not fallback:
+                          raise ValueError("Premise generator produced no structurally complete premise.")
+                      print("PREMISE FILTER FALLBACK — all candidates hit soft novelty filters; using strongest structurally complete premise.")
+                      eligible = fallback
 
                   eligible.sort(key=lambda x: (x[0], -x[1]), reverse=True)
                   premise_score, premise_index, premise = eligible[0]
