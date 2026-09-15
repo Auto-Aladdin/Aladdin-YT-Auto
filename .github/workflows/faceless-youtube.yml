@@ -20,7 +20,7 @@ jobs:
           set -euo pipefail
           sudo apt-get update
           sudo apt-get install -y ffmpeg
-          python3 -m pip install --disable-pip-version-check --no-cache-dir edge-tts
+          python3 -m pip install --disable-pip-version-check --no-cache-dir edge-tts==7.2.8
 
       - name: Generate story, images, voice and video
         env:
@@ -67,7 +67,7 @@ jobs:
           MIN_WORDS = 170
           MAX_WORDS = 230
           SCENES_MIN = 7
-          SCENES_MAX = 14
+          SCENES_MAX = 16
           SCENE_MIN_WORDS = 14
           SCENE_MAX_WORDS = 26
           TARGET_SCENE_MIN_WORDS = 17
@@ -224,8 +224,11 @@ jobs:
                       "setting": {"type": "string"},
                       "scenes": {
                           "type": "array",
-                          "minItems": SCENES_MIN,
-                          "maxItems": SCENES_MAX,
+                          # Scene count is intentionally NOT constrained here.
+                          # Groq must return the complete JSON object first; our
+                          # deterministic validator applies the adaptive scene-count
+                          # rule afterward. This prevents schema-level HTTP 400 errors
+                          # when the model naturally produces a few more scenes.
                           "items": {
                               "type": "object",
                               "properties": {
@@ -373,7 +376,7 @@ jobs:
                   return False
               if ";" in value or "—" in value or "–" in value:
                   return False
-              if not re.search(r"[.!?]$", value):
+              if not re.search(r"[.!?](?:[\"\'\)\]])*$", value):
                   return False
 
               # Do not mistake normal abbreviations for sentence endings.
@@ -381,10 +384,12 @@ jobs:
               check = re.sub(
                   r"\b(?:Mr|Mrs|Ms|Dr|St|Prof|Sr|Jr|vs|e\.g|i\.e)\.",
                   lambda m: m.group(0).replace(".", "<DOT>"),
-                  value[:-1],
+                  value,
                   flags=re.IGNORECASE,
               )
 
+              # A terminal punctuation mark may be followed by closing quotes or brackets.
+              check = re.sub(r"[.!?](?=[\"\'\)\]]*$)", "<END>", check)
               return not bool(re.search(r"[.!?]\s+", check))
 
           def validate_story(story):
@@ -514,20 +519,20 @@ jobs:
                       "scenes": [
                         {{
                           "scene": 1,
-                          "narration": "16-24 spoken words",
+                          "narration": "14-26 spoken words",
                           "visual_prompt": "cinematic faceless still-image prompt; include subject, environment, action, lighting and camera framing"
                         }}
                       ]
                     }}
 
                     SCENE REQUIREMENTS
-                    - Use 7-14 scenes, choosing the count that best fits the story.
-                    - Every narration should target 17-21 words; hard validation allows 14-26.
-                    - Total narration should target 180-210 words; hard validation allows 170-230.
+                    - Use 7-16 scenes, choosing the count that best fits the story. This is validated after generation.
+                    - Keep narration lengths natural for the chosen scene count: target roughly 17-21 words when practical, but shorten or lengthen individual scenes as needed so the complete story stays coherent and the hard 14-26 word range and 170-230 total-word range are satisfied.
+                    - Total narration should target 180-210 words; hard validation allows 170-230, and scene count should be chosen so this is achievable without filler or forced sentence lengths.
                     - EVERY narration must be exactly ONE sentence.
                     - Keep each sentence direct and conversational, suitable for voice-over.
                     - Scenes must form one continuous causal story with no unexplained jumps.
-                    - Choose the scene count based on the story, not a fixed template: use fewer scenes for a tight story and more when a meaningful beat needs its own visual.
+                    - Choose the scene count based on the story, not a fixed template: use fewer scenes for a tight story and more when a meaningful beat needs its own visual, within the 7-16 validated range.
                     - Every scene must add new information, action, decision, consequence, or emotional change; never create filler scenes.
                     - Scene 1 must clearly introduce who is doing what and why it matters.
                     - Scene 2-3 establish the human problem in concrete terms.
@@ -594,11 +599,11 @@ jobs:
                     - description
                     - protagonist object with fields: name, age, role, visual_identity
                     - setting
-                    - between 7 and 14 scenes, choosing the count that fits the story
+                    - between 7 and 16 scenes, choosing the count that fits the story
                     - each scene has scene, narration, visual_prompt
-                    - each narration should target 17-21 words; hard allowance 14-26
-                    - total narration should target 180-210 words; hard allowance 170-230
-                    - scene count must remain within 7-14 and should match the natural pacing of the story
+                    - narration lengths should be natural for the chosen scene count; target roughly 17-21 words when practical, with hard allowance 14-26 per scene
+                    - total narration should target 180-210 words; hard allowance 170-230, with natural variation in scene lengths when the chosen scene count requires it
+                    - scene count must remain within 7-16 and should match the natural pacing of the story
                     - never add filler scenes solely to reach a target count
                     - each narration must be exactly ONE simple sentence
                     - avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. inside narration when possible
@@ -673,6 +678,8 @@ jobs:
               voice,
               "--rate",
               "+2%",
+              "--boundary",
+              "sentence",
               "--text",
               script,
               "--write-media",
