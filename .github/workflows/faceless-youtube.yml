@@ -564,7 +564,7 @@ jobs:
                       "scenes": [
                         {{
                           "scene": 1,
-                          "narration": "12-26 spoken words",
+                          "narration": "10-32 spoken words",
                           "visual_prompt": "high-detail cinematic 3D animation frame prompt with exact action, characters, environment, composition, lighting, camera, continuity and visual storytelling"
                         }}
                       ]
@@ -572,7 +572,7 @@ jobs:
 
                     SCENE REQUIREMENTS
                     - Use 7-16 scenes, choosing the count that naturally fits the story.
-                    - Target roughly 17-21 words per scene when practical, while respecting the hard 12-26 range and 170-230 total-word range.
+                    - Target roughly 17-21 words per scene when practical, while respecting the hard 10-32 range and 105-230 total-word range.
                     - Scene 1 is the strongest hook and must show the opening event directly.
                     - Scene 2 deepens the problem or adds an immediate complication.
                     - Scene 3 makes the goal, mystery, or stakes unmistakable.
@@ -620,8 +620,7 @@ jobs:
                   max_tokens=2800,
                   temperature=0.65,
                   label="story-1",
-                  response_schema=STORY_SCHEMA,
-              )
+                        )
 
               # Local deterministic cleanup: remove punctuation-only fragmentation
               # without consuming another Groq request.
