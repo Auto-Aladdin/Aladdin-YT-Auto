@@ -45,7 +45,7 @@ jobs:
           MAX_DURATION = 180
 
           MAX_STORY_ATTEMPTS = 4
-          MAX_API_CALLS = 24
+          MAX_API_CALLS = 36
           MIN_SECONDS_BETWEEN_CALLS = 9.0
 
           API_KEY = os.environ["GROQ_API_KEY"]
@@ -76,6 +76,14 @@ jobs:
               "market stall operations",
               "sports facility operations",
               "volunteer organization logistics",
+              "adult sibling coordination",
+              "neighborhood committee dispute",
+              "community class administration",
+              "estate clean-out logistics",
+              "shared workspace management",
+              "local archive preservation",
+              "small event cancellation and recovery",
+              "rental property handover",
           ]
 
           SETTINGS = [
@@ -99,6 +107,15 @@ jobs:
               "a neighborhood sign-making workshop",
               "a small packaging room behind a retail shop",
               "a public recreation center office",
+              "a laundromat during a quiet afternoon",
+              "a neighborhood storage unit corridor",
+              "a small second-hand furniture showroom",
+              "a shared artist workspace",
+              "a local community hall kitchen",
+              "a residential building lobby during maintenance",
+              "a public archive reading room",
+              "a modest bicycle storage room",
+              "a neighborhood market office",
           ]
 
           RELATIONSHIPS = [
@@ -114,6 +131,12 @@ jobs:
               "two colleagues handing over unfinished work",
               "a repair technician and an owner",
               "a renter and a property caretaker",
+              "adult siblings dividing a practical responsibility",
+              "a former apprentice and a mentor",
+              "two neighbors resolving a recurring nuisance",
+              "a customer and a specialist who remember a past mistake",
+              "two friends handling an unfinished obligation",
+              "an adult child and an elderly relative managing paperwork",
           ]
 
           MECHANISMS = [
@@ -240,9 +263,8 @@ jobs:
                           "additionalProperties": False,
                       },
                   },
-                  "selected_index": {"type": "integer", "minimum": 0, "maximum": 3},
               },
-              "required": ["premises", "selected_index"],
+              "required": ["premises"],
               "additionalProperties": False,
           }
 
@@ -424,7 +446,7 @@ jobs:
                       headers={
                           "Authorization": f"Bearer {API_KEY}",
                           "Content-Type": "application/json",
-                          "User-Agent": "Aladdin-YT-Auto/Final-Core-Rebuild",
+                          "User-Agent": "Aladdin-YT-Auto/Final-Workflow-V6",
                       },
                       method="POST",
                   )
@@ -558,7 +580,9 @@ jobs:
               emotion = rng.choice(EMOTIONS)
 
               return f"""
-          Generate FOUR radically different premises for one original faceless YouTube Short.
+          Generate FOUR radically different, compact premises for one original faceless YouTube Short.
+          Return four genuinely distinct story families; do not produce four versions of the same
+          workplace repair, deadline, records discrepancy, equipment failure, or safety scenario.
           This is candidate {attempt}. The final channel goal is high-quality human micro-drama,
           not motivational poetry and not a morality fable.
 
@@ -579,10 +603,11 @@ jobs:
           - give at least two plausible options, both with believable downsides;
           - create a lasting consequence that is NOT a reward;
           - use one plot-essential visual motif;
-          - derive emotion from action, cost and consequence;
+          - derive emotion from a real adult relationship, action, cost and consequence;
           - work completely without identifiable faces;
           - be physically and institutionally believable;
           - avoid romance as the central engine;
+          - include a meaningful adult-to-adult relationship that changes how the decision feels;
           - avoid child danger, illness, hospitals, magic, miracles, benefactors, hidden fortunes,
             coincidence-based rescues, work-vs-child, lie-vs-truth, delivery-driver honesty,
             coffee-shop dilemmas, train-platform dilemmas, elevator/blackout stories,
@@ -591,6 +616,10 @@ jobs:
             and "ordinary worker helps someone and gets rewarded" structures.
 
           IMPORTANT: these should feel like plots a good live-action short film could actually shoot.
+          At least two premises must use a relationship-driven conflict rather than a machine,
+          deadline, inventory, or data-integrity problem. At least one premise must involve a
+          personal history or prior mistake that changes a practical present-day decision without
+          becoming a sentimental-object reveal. Never use "data integrity vs speed" as the core dilemma.
           Avoid symbolic-object stories where an object exists mainly to trigger a memory.
           Avoid emergencies that exist only to manufacture tension.
           Avoid a protagonist being morally "tested" by an obviously virtuous choice.
@@ -614,11 +643,13 @@ jobs:
 
           STORY DESIGN:
           1. Start inside a specific action that creates an unanswered practical question.
-          2. Establish the adult protagonist and concrete goal immediately.
+          2. Establish the adult protagonist, their existing relationship to at least one other adult,
+             and concrete goal immediately.
           3. Escalate through physical/logistical/interpersonal cause and effect.
-          4. Give at least two plausible options with different real downsides.
+          4. Give at least two plausible options with different real downsides; neither should be
+             simply "wait or do it now" or "tell the truth or lie".
           5. Make the decision produce a cost that remains real afterward.
-          6. Make the turning point depend on a fact, skill, constraint or earlier action already planted.
+          6. Make the turning point depend on a fact, skill, relationship detail, constraint or earlier action already planted.
           7. End with a believable changed situation, not a reward parade.
           8. Let emotion come from what happened, not from speeches.
           9. Keep every scene necessary.
@@ -626,9 +657,9 @@ jobs:
 
           WORD/SCALE CONTRACT:
           - 9-11 scenes exactly.
-          - Every scene 14-28 spoken words.
-          - Total narration target 170-220 words.
-          - Absolute accepted range 150-250 words.
+          - Every scene 14-28 spoken words when possible.
+          - Total narration target 165-220 words.
+          - Absolute accepted range 135-250 words.
           - The last scene must resolve the central problem without making life perfect.
 
           DO NOT USE:
@@ -638,6 +669,10 @@ jobs:
           instant promotions, bonuses, applause, thank-you notes, random strangers solving the plot,
           red ribbons, glowing objects, ticking clocks, sentimental hidden messages, or generic
           motivational language.
+
+          The story should contain a human relationship, concrete personal stake, and an earned
+          emotional shift caused by what the protagonist actually does. Avoid stories that feel like
+          maintenance manuals or office process puzzles.
 
           Return ONLY JSON matching the supplied schema.
           """
@@ -666,7 +701,33 @@ jobs:
           train-platform, elevator, blackout, concert, ticking-clock, or sentimental-object plot.
           Add only concrete action, reaction, transition and necessary cause-and-effect detail.
           Keep 9-11 scenes and faceless filmability.
-          Every scene should contain at least 14 spoken words.
+          Every scene should contain 14-26 spoken words where practical.
+          The final total MUST be at least {MIN_WORDS} words; aim for 175-210 rather than barely
+          crossing the minimum.
+          Before returning, scan the rewritten story against every banned pattern and phrase in
+          the system prompt. If the draft would contain any banned pattern, rewrite that sentence
+          again without the banned concept. Never introduce a new plot device during length repair.
+          Return ONLY corrected story JSON.
+
+          STORY:
+          {json.dumps(story, ensure_ascii=False)}
+          """
+
+          def make_field_repair_prompt(story, field, reason):
+              return f"""
+          Make one minimal structural correction to the story below.
+
+          FAILED FIELD: {field}
+          REASON: {reason}
+
+          Rewrite only what is necessary to make this field concrete, specific and useful to the
+          existing plot. Preserve the protagonist, central mechanism, choice, cost, consequence,
+          turning point, payoff and scene sequence unless a tiny consistency edit is unavoidable.
+          For desire: state exactly what the protagonist must accomplish TODAY and what concrete
+          outcome they need. It must be observable, not a vague feeling such as "to make things right",
+          "to prove themselves", "to help", or "to fix the situation".
+          Do not add a subplot, reward ending, moral speech, coincidence, magic, child danger,
+          illness, benefactor, bonus, promotion, or sentimental-object reveal.
           Return ONLY corrected story JSON.
 
           STORY:
@@ -742,18 +803,50 @@ jobs:
               try:
                   premise_pack = call_groq(
                       make_premise_prompt(attempt), PREMISE_SCHEMA,
-                      temperature=0.88, max_tokens=2300
+                      temperature=0.84, max_tokens=3000
                   )
-                  premises = premise_pack["premises"]
-                  selected = int(premise_pack["selected_index"])
-                  if not 0 <= selected < len(premises):
-                      selected = 0
-                  premise = premises[selected]
+                  premises = premise_pack.get("premises", [])
+                  if len(premises) < 3:
+                      raise ValueError("Premise generator returned fewer than 3 premises.")
 
-                  premise_text = json.dumps(premise, ensure_ascii=False).lower()
-                  banned = next((p for p in BANNED_PATTERNS if p in premise_text), None)
-                  if banned:
-                      raise ValueError(f"Selected premise contains banned pattern: {banned}")
+                  # The model no longer selects the winner. Deterministically choose the
+                  # strongest eligible premise in Python so a malformed/missing selector
+                  # can never produce another schema failure or arbitrary choice.
+                  eligible = []
+                  for idx, item in enumerate(premises):
+                      premise_text = json.dumps(item, ensure_ascii=False).lower()
+                      banned = next((term for term in BANNED_PATTERNS if term in premise_text), None)
+                      if banned:
+                          print(f"PREMISE {idx + 1} REJECTED — banned pattern: {banned}")
+                          continue
+                      generic_engine_terms = (
+                          "data integrity vs speed", "manual versus machine",
+                          "wait or do it now", "fix it before the game",
+                          "repair it before the event", "deadline vs quality"
+                      )
+                      if any(term in premise_text for term in generic_engine_terms):
+                          print(f"PREMISE {idx + 1} REJECTED — generic procedural engine")
+                          continue
+                      required_keys = [
+                          "title_seed", "protagonist_name", "protagonist_age", "protagonist_role",
+                          "setting", "immediate_goal", "mechanism", "choice", "cost",
+                          "lasting_consequence", "visual_motif", "why_fresh", "score",
+                      ]
+                      if any(not str(item.get(k, "")).strip() for k in required_keys):
+                          print(f"PREMISE {idx + 1} REJECTED — incomplete fields")
+                          continue
+                      if not (21 <= int(item.get("protagonist_age", 0)) <= 70):
+                          continue
+                      if len(str(item.get("why_fresh", "")).split()) < 8:
+                          continue
+                      eligible.append((int(item.get("score", 0)), idx, item))
+
+                  if not eligible:
+                      raise ValueError("Premise generator produced no eligible premise.")
+
+                  eligible.sort(key=lambda x: (x[0], -x[1]), reverse=True)
+                  premise_score, premise_index, premise = eligible[0]
+                  print(f"SELECTED PREMISE {premise_index + 1}/{len(premises)} — score={premise_score}")
 
                   candidate = call_groq(
                       make_story_prompt(premise), STORY_SCHEMA,
@@ -763,15 +856,31 @@ jobs:
                   local_issue = local_story_check(candidate)
                   if local_issue and local_issue.startswith("Story is too short"):
                       print("CANDIDATE LENGTH CHECK:", local_issue)
-                      print("RUNNING ONE TARGETED LENGTH REPAIR")
-                      repaired_length = call_groq(
-                          make_length_repair_prompt(candidate), STORY_SCHEMA,
-                          temperature=0.42, max_tokens=3000
+                      print("RUNNING BOUNDED TARGETED LENGTH REPAIR")
+                      for length_pass in range(1, 3):
+                          repaired_length = call_groq(
+                              make_length_repair_prompt(candidate), STORY_SCHEMA,
+                              temperature=0.38 if length_pass == 1 else 0.30,
+                              max_tokens=3000
+                          )
+                          candidate = repaired_length
+                          local_issue = local_story_check(candidate)
+                          if not local_issue:
+                              print(f"LENGTH REPAIR PASSED ON PASS {length_pass}")
+                              break
+                          print(f"LENGTH REPAIR PASS {length_pass} RESULT:", local_issue)
+
+                  if local_issue and local_issue.startswith("desire is too vague"):
+                      print("CANDIDATE DESIRE CHECK:", local_issue)
+                      print("RUNNING ONE TARGETED DESIRE REPAIR")
+                      repaired_field = call_groq(
+                          make_field_repair_prompt(candidate, "desire", local_issue), STORY_SCHEMA,
+                          temperature=0.34, max_tokens=3000
                       )
-                      candidate = repaired_length
+                      candidate = repaired_field
                       local_issue = local_story_check(candidate)
                       if local_issue:
-                          print("LENGTH-REPAIRED CANDIDATE LOCAL CHECK:", local_issue)
+                          print("DESIRE-REPAIRED CANDIDATE LOCAL CHECK:", local_issue)
 
                   if local_issue:
                       print("CANDIDATE LOCAL CHECK:", local_issue)
@@ -802,7 +911,7 @@ jobs:
 
                   # Repair only a reasonably viable candidate. Very weak candidates are
                   # replaced by the next independently generated premise.
-                  if critique["score_average"] >= 5.8:
+                  if critique["score_average"] >= 4.5:
                       print("CANDIDATE FAILED — RUNNING ONE STRUCTURAL REPAIR")
                       repaired = call_groq(
                           make_repair_prompt(candidate, critique), STORY_SCHEMA,
@@ -811,12 +920,18 @@ jobs:
 
                       repaired_issue = local_story_check(repaired)
                       if repaired_issue and repaired_issue.startswith("Story is too short"):
-                          print("REPAIRED STORY TOO SHORT — RUNNING ONE LENGTH REPAIR")
-                          repaired = call_groq(
-                              make_length_repair_prompt(repaired), STORY_SCHEMA,
-                              temperature=0.42, max_tokens=3000
-                          )
-                          repaired_issue = local_story_check(repaired)
+                          print("REPAIRED STORY TOO SHORT — RUNNING BOUNDED LENGTH REPAIR")
+                          for length_pass in range(1, 3):
+                              repaired = call_groq(
+                                  make_length_repair_prompt(repaired), STORY_SCHEMA,
+                                  temperature=0.36 if length_pass == 1 else 0.28,
+                                  max_tokens=3000
+                              )
+                              repaired_issue = local_story_check(repaired)
+                              if not repaired_issue:
+                                  print(f"REPAIRED LENGTH PASSED ON PASS {length_pass}")
+                                  break
+                              print(f"REPAIRED LENGTH PASS {length_pass} RESULT:", repaired_issue)
 
                       if repaired_issue:
                           print("REPAIRED CANDIDATE LOCAL CHECK:", repaired_issue)
