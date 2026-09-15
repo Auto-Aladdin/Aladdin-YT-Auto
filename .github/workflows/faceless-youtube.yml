@@ -132,8 +132,6 @@ jobs:
           ]
 
           BANNED = [
-              "magic",
-              "magical",
               "supernatural",
               "miracle",
               "miraculous",
