@@ -754,7 +754,8 @@ jobs:
                     - 7-16 scenes; prefer 8-10; never add filler.
                     - Every scene has scene, narration, visual_prompt.
                     - Narration: exactly ONE natural spoken sentence, 12-26 words, target 17-21.
-                    - Total narration: 170-230 words, target 180-210.
+                    - Total narration MUST be at least 170 words and at most 230 words. Before returning JSON, count all scene narration words. If the total is below 170, expand the existing scenes naturally until it is at least 170; never return an under-170 story.
+                    - Total narration target: 180-210 words when practical, without filler.
                     - Simple spoken English; concrete actions; no semicolons, em dashes, multiple sentences, literary wording, or vague metaphors.
                     - Preserve causal flow, strongest hook, character continuity, modest family-friendly wardrobe, and original visual style.
                     - No banned patterns.
