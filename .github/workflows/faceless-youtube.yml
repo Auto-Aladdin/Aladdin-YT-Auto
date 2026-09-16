@@ -69,8 +69,8 @@ jobs:
 
           MIN_WORDS = 165
           MAX_WORDS = 230
-          SCENES_MIN = 7
-          SCENES_MAX = 16
+          SCENES_MIN = 8
+          SCENES_MAX = 10
           SCENE_MIN_WORDS = 12
           SCENE_MAX_WORDS = 27
           TARGET_SCENE_MIN_WORDS = 17
@@ -669,44 +669,22 @@ jobs:
 
           def create_story():
               prompt = f"""
-              Create ONE original 35-60 second animated Short. Make it specific, visual, emotionally engaging, and easy to follow on first listen.
+              Create ONE original 35–60 second animated Short that feels authored, visual, emotional, and easy to follow.
 
-              STORY
-              - Build a clear cause-and-effect mini-film: hook, situation, goal, obstacle, attempt, setback or reveal, meaningful choice, consequence, payoff.
-              - Give the adult protagonist real agency. Their actions or decisions must cause the outcome.
-              - Make the premise materially different from recent stories in premise, motivation, conflict, escalation, reveal, emotion, and ending.
-              - Avoid generic lessons, random luck, convenient strangers, recycled rescues, fake cliffhangers, over-explaining, and familiar viral/Reddit/creator plots.
-              - Start naturally inside an action or situation. Reveal a precise problem, discovery, decision, or misunderstanding. Never start with “One day” or a biography dump.
-              - Use natural spoken English. Every narration is one sentence and should add information, emotion, cause, clue, or consequence rather than describe every visible movement.
-              - Target 190-210 total narration words across 8-10 scenes, with 18-22 words per scene when possible and 12-26 allowed.
-              - Every scene must advance the story. At least one attempt should fail, backfire, or reveal a constraint. The ending must be caused by earlier details or choices.
+              STORY: Use a clear hook, concrete goal, obstacle, attempt, setback/reveal, meaningful choice, consequence, and earned payoff. The protagonist must cause the outcome. Vary the premise, motivation, conflict, twist, emotion, and ending from recent stories. No generic moral, random luck, convenient stranger, recycled rescue, fake cliffhanger, or copied viral/Reddit plot.
 
-              CHARACTERS
-              Create one specific adult protagonist: age, name, role, face shape, eyes, brows, hairstyle/color, skin tone, build, fixed outfit/colors, shoes, and ONE distinctive accessory. Keep every trait identical in every scene. Give important supporting characters their own consistent identities. Never make named characters look alike.
+              NARRATION: Natural spoken English. One sentence per scene. Add story information, clue, emotion, or consequence; do not narrate obvious visuals. Target 18–22 words per scene and 190–210 total words across 8–10 scenes.
 
-              VISUAL STYLE
-              Every scene belongs to the SAME premium hand-drawn 2D animated film: expressive stylized humans, believable slightly exaggerated anatomy, large expressive eyes, readable faces, clean dark ink outlines with varied line weight, painterly digital coloring, subtle cel shading, soft gradients, textured brushwork, rich slightly muted cinematic colors, strong depth, atmospheric lighting, realistic cast/contact shadows, polished environments.
-              Never photorealistic, live-action, 3D CGI, anime, manga, chibi, flat vector, or generic AI cartoon.
+              CHARACTER: One specific adult protagonist with fixed age, name, role, face, eyes, brows, hair, skin tone, build, outfit/colors, shoes, and ONE signature accessory. Keep identity and wardrobe identical across scenes. Important supporting characters also stay consistent and distinct.
 
-              SCENES
-              Every scene must be a new cinematic frame, not a repeated portrait. Show one dominant physical action or visible change. Vary shot size, angle, composition, location zone, interaction, and prop state while preserving character continuity. Keep action readable in vertical 9:16, with clear silhouettes, believable hands, grounded poses, meaningful props, and strong foreground/midground/background depth.
-              If narration says a supporting character acts, reacts, receives, searches, warns, fixes, hides, or speaks, that character must be visible and important in the frame. If two characters interact, show the interaction.
+              VISUAL STYLE: Same premium hand-drawn 2D animated film in every scene: expressive stylized humans, believable exaggerated anatomy, large expressive eyes, clean dark ink outlines, painterly digital color, subtle cel shading, soft gradients, textured brushwork, rich slightly muted cinematic colors, strong depth, atmospheric light, realistic contact/cast shadows, polished environments. Avoid photorealistic, live-action, 3D CGI, anime, manga, chibi, flat vector, generic AI cartoon.
 
-              VISUAL PROMPT FORMAT
-              Use these labels in this exact order for every scene:
-              SCENE: one frozen cinematic moment
-              PRIMARY VISUAL SUBJECT: one person or object
-              ON-SCREEN CHARACTERS: every relevant visible character with identifiers
-              CHARACTER: full locked identity of the primary character when central
-              ACTION: exact physical action and who performs it
-              LOCATION: specific environment and important objects
-              MOOD: visible emotion through expression/body/light
-              CAMERA: shot size, angle, height, composition, priority
-              LIGHTING: key light, temperature, time/weather, shadows
-              CONTINUITY: fixed identity, wardrobe, accessory, important prop state
-              VISUAL DIFFERENTIATION: what changes from the previous scene
+              SCENES: Every scene is a different cinematic frame with one dominant physical action or visible change. Vary shot size, angle, composition, interaction, prop state, and location zone. Keep vertical 9:16 framing, readable poses, believable hands, grounded bodies, meaningful props, and clear foreground/midground/background depth. When narration names a supporting character's action, show that character prominently.
 
-              DIVERSIFIERS
+              VISUAL_PROMPT: For every scene use these labels in order, keeping each field concise but concrete:
+              SCENE | PRIMARY VISUAL SUBJECT | ON-SCREEN CHARACTERS | CHARACTER | ACTION | LOCATION | MOOD | CAMERA | LIGHTING | CONTINUITY | VISUAL DIFFERENTIATION
+
+              Use these creative starting points, not templates:
               Domain: {random.choice(DOMAINS)}
               Setting: {random.choice(SETTINGS)}
               Emotion: {random.choice(EMOTIONS)}
@@ -714,17 +692,16 @@ jobs:
               Twist: {random.choice(TWIST_MODES)}
               Ending: {random.choice(ENDING_MODES)}
 
-              RECENT STORIES
+              RECENT STORIES:
               {recent_text}
 
-              OUTPUT
-              Return ONLY valid JSON matching the supplied schema. No markdown or commentary. Before returning, silently check originality, story logic, natural narration, 190-210 total narration words, consistent characters, distinct visual beats, and a satisfying earned ending.
-              """
+              Return ONLY valid JSON matching the schema. Silently check: originality, story logic, natural narration, 190–210 words, 8–10 scenes, locked character continuity, varied visual beats, and an earned ending.
+                        """
 
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
                       prompt,
-                      max_tokens=4000,
+                      max_tokens=2300,
                       temperature=0.65,
                       label=f"story-{call_number}",
                       response_schema=STORY_SCHEMA,
@@ -804,7 +781,7 @@ jobs:
 
                     TARGETS:
                     - 12-26 narration words per scene, target 18-22.
-                    - Total narration 165-230 words, target 185-205.
+                    - Total narration 165-230 words, target 190-210.
                     - Preserve the same causal story, continuity, tone, and visual plan.
                     - Do not add filler or invent a new plot point just to change word count.
 
@@ -816,7 +793,7 @@ jobs:
 
                   story = groq_json(
                       repair_prompt,
-                      max_tokens=2200,
+                      max_tokens=1700,
                       temperature=0.25,
                       label=f"repair-{call_number}",
                       response_schema=STORY_SCHEMA,
