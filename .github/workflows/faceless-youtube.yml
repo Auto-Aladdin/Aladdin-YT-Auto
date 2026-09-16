@@ -669,7 +669,7 @@ jobs:
                     LIGHTING: [key light, color temperature, time/weather, shadows]
                     CONTINUITY: [exact clothing/prop/appearance details that must match earlier scenes for EVERY returning character and important object]
                     VISUAL DIFFERENTIATION: [what visibly changes from the previous scene: subject, location, camera, action, character interaction, prop state, or composition]
-                    Each scene must be a genuinely new visual beat, not another portrait of the same character in the same location. Character identity stays locked, but framing, subject, interaction, environment, action, and composition must change when the story changes.
+                    Each scene must be a genuinely new visual beat, not another portrait of the same character in the same location. Character identity stays locked, but framing, subject, interaction, environment, action, and composition must change when the story changes. Keep the visual_prompt specific to the scene; do not repeat the MASTER VISUAL UNIVERSE or lengthy style prose inside every scene.
                     If narration mentions a second character performing an action, receiving an object, being called, arriving, speaking, chasing, warning, passing something, or becoming the reason for the scene, that character MUST be visible and visually important in that scene unless the story intentionally withholds them as a mystery.
                     If two characters interact, show the interaction itself; do not replace the second character with the protagonist alone.
 
@@ -699,7 +699,7 @@ jobs:
                     {recent_text}
 
                     FINAL SELF-CHECK
-                    Before returning JSON, silently verify: strong immediate hook; active protagonist; clear goal/problem; every scene changes the situation; at least one setback/reversal; earned payoff; material difference from recent history; consistent character/art style; natural storyteller voice; every scene visually filmable. Delete filler and repetition.
+                    Before returning JSON, silently verify: strong natural opening; clear goal/problem; causal scene progression; at least one setback/reversal; earned payoff; material difference from recent history; distinct characters and visuals; natural storyteller voice. Delete filler and repetition.
 
                     OUTPUT CONTRACT
                     Return ONLY this top-level JSON object and nothing else:
@@ -718,7 +718,7 @@ jobs:
                         {{
                           "scene": 1,
                           "narration": "one natural spoken sentence, 12-26 words",
-                          "visual_prompt": "SCENE: ... CHARACTER: ... ACTION: ... LOCATION: ... MOOD: ... CAMERA: ... LIGHTING: ... CONTINUITY: ..."
+                          "visual_prompt": "SCENE: ... PRIMARY VISUAL SUBJECT: ... ON-SCREEN CHARACTERS: ... CHARACTER: ... ACTION: ... LOCATION: ... MOOD: ... CAMERA: ... LIGHTING: ... CONTINUITY: ... VISUAL DIFFERENTIATION: ..."
                         }}
                       ]
                     }}
@@ -726,6 +726,7 @@ jobs:
                     SCENE CONTRACT
                     - Plan 8-10 scenes when practical; never fewer than 7 or more than 16, and never pad with filler.
                     - Target 17-21 narration words per scene; hard range 12-26. Count every scene before returning.
+                    - Keep each visual_prompt detailed but compact, normally about 45-80 words; do not repeat the full art-style prose inside each scene.
                     - Total narration 170-230 words without filler.
                     - Every narration is exactly ONE natural spoken sentence.
                     - Scene 1: naturally introduce the protagonist in the middle of an ordinary or unusual action, then immediately reveal the problem, interruption, clue, risk, or question that makes the viewer need the next scene.
