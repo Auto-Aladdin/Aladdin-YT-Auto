@@ -63,6 +63,7 @@ jobs:
           SCENES = ASSETS / "clips"
 
           HISTORY_FILE = ROOT / ".github" / "data" / "story_history.json"
+          GROQ_USAGE_FILE = ROOT / ".github" / "data" / "groq_usage.json"
 
           API_KEY = os.environ["GROQ_API_KEY"]
 
@@ -203,7 +204,6 @@ jobs:
               "hidden fortune",
               "anonymous donor",
               "bonus",
-              "applause",
               "thank-you note",
               "elevator",
               "blackout",
@@ -215,22 +215,9 @@ jobs:
               "glowing object",
               "red ribbon",
               "random stranger",
-              "reverie",
-              "poignant",
-              "tentative",
-              "fragile peace",
-              "scars remain",
-              "healing",
-              "silent apology",
-              "unspoken pain",
-              "haunting memory",
               "life lesson",
               "lesson in",
               "moral of the story",
-              "moral",
-              "inspirational message",
-              "never give up",
-              "believe in yourself",
               "everything happens for a reason",
               "you won't believe",
               "watch until the end",
@@ -258,6 +245,20 @@ jobs:
                   return data if isinstance(data, list) else []
               except Exception:
                   return []
+
+          def load_groq_usage():
+              today = time.strftime("%Y-%m-%d", time.gmtime())
+              try:
+                  data = json.loads(GROQ_USAGE_FILE.read_text(encoding="utf-8"))
+                  if data.get("utc_date") == today:
+                      return {"utc_date": today, "tokens": int(data.get("tokens", 0) or 0)}
+              except Exception:
+                  pass
+              return {"utc_date": today, "tokens": 0}
+
+          def save_groq_usage(state):
+              GROQ_USAGE_FILE.parent.mkdir(parents=True, exist_ok=True)
+              GROQ_USAGE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
           history = load_history()
           recent = history[-20:]
@@ -317,6 +318,7 @@ jobs:
           # ------------------------------------------------------------
 
           groq_tokens_used_this_run = 0
+          groq_usage_today = load_groq_usage()
           groq_tpd_safe_budget = 160000
           primary_disabled_for_run = False
           groq_remaining_tpm = None
@@ -405,7 +407,7 @@ jobs:
                   raise ProviderHTTPError(provider_name, exc.code, raw) from exc
 
           def groq_json(prompt, max_tokens=2000, temperature=0.55, label="groq", response_schema=None):
-              global last_call, groq_tokens_used_this_run, primary_disabled_for_run, groq_remaining_tpm
+              global last_call, groq_tokens_used_this_run, primary_disabled_for_run, groq_remaining_tpm, groq_usage_today
 
               gap = time.monotonic() - last_call
               if gap < MIN_GAP:
@@ -418,9 +420,19 @@ jobs:
                       "Groq has been disabled for this run after a daily token-limit response."
                   )
 
-              if groq_tokens_used_this_run + estimate > groq_tpd_safe_budget:
+              if (
+                  groq_usage_today["tokens"] + estimate > groq_tpd_safe_budget
+              ):
                   raise RuntimeError(
                       f"Groq proactive daily-token guard stopped {label}: estimated request "
+                      f"≈ {estimate} tokens would exceed the safe daily budget "
+                      f"({groq_tpd_safe_budget} tokens; already recorded today: "
+                      f"{groq_usage_today['tokens']})."
+                  )
+
+              if groq_tokens_used_this_run + estimate > groq_tpd_safe_budget:
+                  raise RuntimeError(
+                      f"Groq proactive per-run guard stopped {label}: estimated request "
                       f"≈ {estimate} tokens would exceed the safe per-run budget "
                       f"({groq_tpd_safe_budget} tokens)."
                   )
@@ -455,7 +467,10 @@ jobs:
                       raise RuntimeError(f"{label} must return a JSON object, got {type(obj).__name__}")
 
                   actual_tokens = parse_provider_usage(data)
-                  groq_tokens_used_this_run += actual_tokens if actual_tokens > 0 else estimate
+                  accounted_tokens = actual_tokens if actual_tokens > 0 else estimate
+                  groq_tokens_used_this_run += accounted_tokens
+                  groq_usage_today["tokens"] += accounted_tokens
+                  save_groq_usage(groq_usage_today)
                   remaining_tpm = headers.get("x-ratelimit-remaining-tokens")
                   if remaining_tpm:
                       try:
@@ -478,6 +493,14 @@ jobs:
                   # silently switch to a paid provider.
                   if exc.code == 429 and groq_daily_exhausted(exc.raw):
                       primary_disabled_for_run = True
+                      used_match = re.search(r"Used\s+(\d+)", exc.raw)
+                      if used_match:
+                          try:
+                              reported_used = int(used_match.group(1))
+                              groq_usage_today["tokens"] = max(groq_usage_today["tokens"], reported_used)
+                              save_groq_usage(groq_usage_today)
+                          except ValueError:
+                              pass
                       raise RuntimeError(
                           "Groq daily token limit reached during " + label + ". "
                           "This workflow is intentionally Groq-only, so it stops cleanly.\n"
@@ -504,7 +527,10 @@ jobs:
                       if not isinstance(retry_obj, dict):
                           raise RuntimeError(f"{label} retry returned non-object JSON.")
                       actual_tokens = parse_provider_usage(retry_data)
-                      groq_tokens_used_this_run += actual_tokens if actual_tokens > 0 else estimate
+                      accounted_tokens = actual_tokens if actual_tokens > 0 else estimate
+                      groq_tokens_used_this_run += accounted_tokens
+                      groq_usage_today["tokens"] += accounted_tokens
+                      save_groq_usage(groq_usage_today)
                       retry_remaining_tpm = retry_headers.get("x-ratelimit-remaining-tokens")
                       if retry_remaining_tpm:
                           try:
@@ -657,6 +683,9 @@ jobs:
               if words(hook) < 10:
                   return "Hook is too short."
 
+              # Only genuinely disallowed patterns reach this check. Harmless vocabulary
+              # such as "applause" is intentionally not a ban because it is not a quality
+              # or policy failure and should never trigger a full-token LLM repair.
               blob = json.dumps(story, ensure_ascii=False)
               bad = banned(blob)
               if bad:
@@ -1418,7 +1447,7 @@ jobs:
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/data/story_history.json
+          git add .github/data/story_history.json .github/data/groq_usage.json
           if git diff --cached --quiet; then
             echo "No history changes to commit."
           else
