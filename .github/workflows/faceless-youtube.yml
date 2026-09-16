@@ -319,7 +319,7 @@ jobs:
 
           groq_tokens_used_this_run = 0
           groq_usage_today = load_groq_usage()
-          groq_tpd_safe_budget = 160000  # Conservative ceiling below Groq's 200K TPD limit
+          groq_tpd_safe_budget = 200000  # Match Groq's reported 200K TPD organization limit
           primary_disabled_for_run = False
           groq_remaining_tpm = None
           GROQ_TPM_SAFETY_MARGIN = 300
