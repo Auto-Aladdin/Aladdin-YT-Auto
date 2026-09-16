@@ -64,12 +64,12 @@ jobs:
 
           API_KEY = os.environ["GROQ_API_KEY"]
 
-          MIN_WORDS = 170
+          MIN_WORDS = 165
           MAX_WORDS = 230
           SCENES_MIN = 7
           SCENES_MAX = 16
           SCENE_MIN_WORDS = 12
-          SCENE_MAX_WORDS = 26
+          SCENE_MAX_WORDS = 27
           TARGET_SCENE_MIN_WORDS = 17
           TARGET_SCENE_MAX_WORDS = 21
 
