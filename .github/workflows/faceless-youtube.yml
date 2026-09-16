@@ -1309,8 +1309,26 @@ jobs:
           fi
 
       - name: Upload finished Short
+        id: upload_short
         uses: actions/upload-artifact@v4
         with:
           name: daily-faceless-short
           path: short-output/
           if-no-files-found: error
+          retention-days: 7
+
+      - name: Show download link
+        if: ${{ success() }}
+        run: |
+          set -euo pipefail
+          ARTIFACT_URL='${{ steps.upload_short.outputs.artifact-url }}'
+          ARTIFACT_ID='${{ steps.upload_short.outputs.artifact-id }}'
+          echo "Artifact ID: ${ARTIFACT_ID}"
+          echo "Download: ${ARTIFACT_URL}"
+          {
+            echo "## Download"
+            echo
+            echo "[Download the finished Short](${ARTIFACT_URL})"
+            echo
+            echo "Artifact ID: ${ARTIFACT_ID}"
+          } >> "${GITHUB_STEP_SUMMARY}"
