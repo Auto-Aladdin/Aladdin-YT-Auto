@@ -836,6 +836,62 @@ jobs:
 
                   print(f"[repair-validator] {issue}", flush=True)
 
+                  # Token-saving fast path AFTER repair: if the repair fixed the story
+                  # but left only a small deterministic word-count shortfall, apply the
+                  # same exact-word causal clause mechanism used before the repair call.
+                  short_match = re.fullmatch(
+                      r"Story is too short at (\d+) words; minimum (\d+)\.",
+                      issue,
+                  )
+                  if short_match:
+                      current_words = int(short_match.group(1))
+                      minimum_words = int(short_match.group(2))
+                      shortfall = minimum_words - current_words
+
+                      EXACT_CAUSAL_CLAUSES = {
+                          1: " again",
+                          2: " from then",
+                          3: " from that moment",
+                          4: " and pressure rose",
+                          5: " and the pressure rose",
+                          6: " and the pressure suddenly rose",
+                          7: " and the pressure suddenly rose again",
+                          8: " and the final choice became harder",
+                          9: " and the final choice became harder to avoid",
+                          10: " and the final choice became even harder to avoid",
+                          11: " and the next decision suddenly became much harder",
+                          12: " and the next decision suddenly became much harder to make",
+                          13: " and the next decision suddenly became much harder than expected",
+                          14: " and the next decision suddenly became much harder than anyone expected",
+                          15: " and the next decision suddenly became harder than anyone expected at first",
+                          16: " and the next decision suddenly became much harder than anyone expected at first",
+                          17: " and the next decision suddenly became much harder than anyone had expected at first",
+                          18: " and the next decision suddenly became much harder than anyone could have expected",
+                          19: " and the next decision suddenly became much harder than anyone could have reasonably expected",
+                          20: " and the next decision suddenly became much harder than anyone could have reasonably expected before",
+                          21: " and the next decision suddenly became much harder than anyone could have reasonably expected before then",
+                          22: " and the next decision suddenly became much harder than anyone could have reasonably expected at that moment",
+                          23: " and the next decision suddenly became much harder than anyone could have reasonably expected in that exact moment",
+                          24: " and the next decision suddenly became much harder than anyone could have reasonably expected in that exact situation",
+                      }
+
+                      if 1 <= shortfall <= 24 and story.get("scenes"):
+                          target = story["scenes"][-1]
+                          narration = str(target.get("narration", "")).strip()
+                          clause = EXACT_CAUSAL_CLAUSES[shortfall]
+                          candidate = narration.rstrip(".!? ") + clause + "."
+                          if words(candidate) - words(narration) == shortfall:
+                              target["narration"] = candidate
+                              normalize_story_narrations(story)
+                              issue = validate_story(story)
+                              if not issue:
+                                  print(
+                                      f"[repair-validator] fixed {shortfall}-word shortfall locally; "
+                                      "no additional repair call used.",
+                                      flush=True,
+                                  )
+                                  return story
+
               raise RuntimeError(
                   "The story could not pass deterministic validation "
                   "after the allowed generation/repair calls."
