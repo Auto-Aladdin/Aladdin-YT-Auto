@@ -671,36 +671,47 @@ jobs:
               prompt = f"""
               Create ONE original 35–60 second animated Short that feels authored, visual, emotional, and easy to follow.
 
-              STORY: Use a clear hook, concrete goal, obstacle, attempt, setback/reveal, meaningful choice, consequence, and earned payoff. The protagonist must cause the outcome. Vary the premise, motivation, conflict, twist, emotion, and ending from recent stories. No generic moral, random luck, convenient stranger, recycled rescue, fake cliffhanger, or copied viral/Reddit plot.
+              STORY: Write a clear, original mini-story with a human situation viewers can understand immediately: a concrete goal, obstacle, attempt, setback/reveal, meaningful choice, consequence, and earned payoff. The protagonist must cause the outcome. Make this story materially different from RECENT STORIES in premise, profession, central object, conflict, twist, emotional progression, and ending. No generic moral, random luck, convenient stranger, recycled rescue, fake cliffhanger, copied viral/Reddit plot, or near-duplicate retelling.
 
-              NARRATION: Natural spoken English. One sentence per scene. Add story information, clue, emotion, or consequence; do not narrate obvious visuals. Target 18–22 words per scene and 190–210 total words across 8–10 scenes.
+              OPENING HOOK: Scene 1 must orient the viewer before escalating. In natural spoken English, quickly establish WHO the main person is, WHERE or WHAT ordinary situation they are in, and ONE specific change/problem/detail that makes us want the next scene. The opening may use the person's name, job, routine, relationship, possession, or immediate task when useful. Vary the sentence structure every story; do NOT repeatedly start with "There was...", "One day...", "Meet...", or the same formula. Prefer concrete human details over vague mystery language. The hook must promise only what the story actually delivers.
 
-              CHARACTER: One specific adult protagonist with fixed age, name, role, face, eyes, brows, hair, skin tone, build, outfit/colors, shoes, and ONE signature accessory. Keep identity and wardrobe identical across scenes. Important supporting characters also stay consistent and distinct.
+              NARRATION: Natural, simple spoken English that is easy to follow on first listen. One sentence per scene. Each sentence must advance cause-and-effect with new story information, clue, emotion, decision, or consequence; do not merely describe the picture. Target 18–22 words per scene and 190–210 total words across 8–10 scenes. Avoid awkward punctuation, broken names, poetic filler, and confusing pronouns.
+
+              CHARACTER CONSISTENCY: Create one specific adult protagonist with fixed age, name, role, face, eyes, brows, hair, skin tone, build, outfit/colors, shoes, and ONE signature accessory. Lock those traits for every scene in THIS story. If the protagonist happens to be a recurring named character such as Alina, preserve the same established identity rather than redesigning her. Do not force the same protagonist name into every new story unless the premise naturally calls for a recurring character. Give important supporting characters a small but distinctive visual identity on first appearance (for example age range, hair, clothing color, glasses, uniform, or other stable feature) and repeat those identifying traits whenever they reappear.
 
               VISUAL STYLE: Same premium hand-drawn 2D animated film in every scene: expressive stylized humans, believable exaggerated anatomy, large expressive eyes, clean dark ink outlines, painterly digital color, subtle cel shading, soft gradients, textured brushwork, rich slightly muted cinematic colors, strong depth, atmospheric light, realistic contact/cast shadows, polished environments. Avoid photorealistic, live-action, 3D CGI, anime, manga, chibi, flat vector, generic AI cartoon.
 
-              SCENES: Every scene is a different cinematic frame with one dominant physical action or visible change. Vary shot size, angle, composition, interaction, prop state, and location zone. Keep vertical 9:16 framing, readable poses, believable hands, grounded bodies, meaningful props, and clear foreground/midground/background depth. When narration names a supporting character's action, show that character prominently.
+              SCENE-STORY MATCH: Treat every scene as a storyboard frame for THAT narration sentence, not as a protagonist portrait. The primary visual subject must be the person, place, object, clue, interaction, or consequence that carries the story beat. If another character performs the important action, make that character prominent. If an object or location is the important reveal, make it visually dominant. The protagonist may be off-center, secondary, partially visible, or absent when the narrated beat does not require them. Never add the protagonist merely because they are the main character. Show the correct supporting characters, props, object states, and location details mentioned or logically required by the narration.
 
-              VISUAL_PROMPT: Write one compact, production-ready cinematic image prompt for each scene.
+              SCENE VARIETY: Every frame must communicate a genuinely different beat. Vary who owns the frame, shot size, angle, composition, number of visible characters, interaction, prop state, environment zone, foreground/midground/background information, and emotional focus. Avoid nine consecutive waist-up portraits, repeated crossed-arm poses, repeated empty bookstore/office backgrounds, or generic smiling-at-camera compositions. When a story beat is about a ledger, machine, letter, food order, bicycle, train board, key, customer, vendor, crowd, room, or other concrete element, visibly show that element as important.
+
+              VISUAL_PROMPT: Write one compact, production-ready cinematic image prompt for each scene. It must describe the exact freeze-frame that best proves the narration visually.
 
               Every visual_prompt MUST naturally include:
-              - primary visual subject
-              - all important on-screen characters
-              - character identity/appearance when relevant
-              - one clear physical action or visible change
-              - location and environment
-              - mood/emotion
-              - camera shot/angle/composition
+              - the true primary visual subject for THIS beat
+              - only the characters who should actually be on screen
+              - stable identifying traits for every returning character who appears
+              - the specific physical action, interaction, clue, object state, or visible consequence
+              - the correct location/environment and meaningful story props
+              - mood/emotion shown through visible behavior
+              - camera shot/angle/composition chosen for this beat
               - lighting
-              - continuity with established characters, wardrobe, props, and setting
-              - a distinct visual beat that differs from nearby scenes
+              - continuity with established wardrobe, character identity, props, and setting
+              - a distinct visual beat clearly different from adjacent scenes
 
-              Do NOT use field labels, headings, bullet points, or repeated boilerplate.
+              VISUAL OWNERSHIP RULE: Before writing each visual_prompt, ask "What must the viewer SEE to understand this exact narration with the sound muted?" Make that answer the focus. Do not default to the protagonist. Do not mention a supporting character in narration and then hide them in the background. Do not describe an important object in narration without showing it clearly.
+
+              Do NOT use field labels, headings, bullet points, or repeated boilerplate inside visual_prompt.
               Do NOT restate the global art style in every scene.
-              Do NOT repeat character descriptions unless needed for continuity or a meaningful visual change.
+              Do NOT repeat the protagonist's full description unless needed for continuity; use the saved identity consistently.
               Use concrete visual nouns and verbs instead of long adjective chains.
-              Keep each visual_prompt approximately 28–42 words.
-              Prioritize what the image generator must visibly depict over explanation.
+              Keep each visual_prompt approximately 30–48 words so supporting characters, props, locations, and actions have enough room to be explicit.
+              Prioritize story accuracy and visual ownership over making the protagonist look attractive or centered.
+
+              YOUTUBE SAFETY & ORIGINALITY: Keep the story fictional, family-friendly, and suitable for a broad audience. Do not glorify dangerous acts, scams, hate, graphic violence, sexual content, harmful challenges, illegal instructions, or deceptive claims. Do not imitate a real person's identity or present fabricated real-world claims as fact. Originality matters: automation is not permission to mass-produce near-identical plots, openings, scenes, titles, or endings.
+
+              SEO METADATA: The `title` and `description` must accurately describe THIS exact story. Make the title concise, curiosity-driven, natural, and specific, with the strongest story concept or searchable phrase near the beginning when it fits; no false clickbait, ALL-CAPS spam, or misleading promise. Write a unique description in 2 concise sentences using 1–2 natural story-specific keywords that also appear or are clearly represented in the story. Do not keyword-stuff.
+
               IMPORTANT: In each scene object, the `scene` field MUST be a JSON integer (1, 2, 3...), never a quoted string.
 
               Use these creative starting points, not templates:
@@ -714,7 +725,7 @@ jobs:
               RECENT STORIES:
               {recent_text}
 
-              Return ONLY valid JSON matching the schema. Silently check: originality, story logic, natural narration, 190–210 words, 8–10 scenes, locked character continuity, varied visual beats, and an earned ending.
+              Return ONLY valid JSON matching the schema. Silently check: opening orientation + hook, originality against recent stories, clear cause-and-effect, natural narration, 190–210 words, 8–10 scenes, locked protagonist/supporting-character continuity, exact narration-to-scene correspondence, varied visual ownership, accurate SEO title/description, policy-safe content, and an earned ending.
                         """
 
               for call_number in range(1, MAX_STORY_CALLS + 1):
@@ -957,11 +968,13 @@ jobs:
           for index, scene in enumerate(story["scenes"], 1):
               output = IMAGES / f"scene_{index:02d}.png"
               visual_anchor = (
-                  f"CHARACTER LOCK — {story['protagonist']['name']}; adult age {story['protagonist']['age']}; "
+                  f"CHARACTER REFERENCE LOCK — {story['protagonist']['name']}; adult age {story['protagonist']['age']}; "
                   f"role {story['protagonist']['role']}; EXACT IDENTITY: {story['protagonist']['visual_identity']}. "
-                  "Treat this identity as immutable. Preserve the exact face structure, eye design, eyebrow shape, "
-                  "hair shape and color, skin tone, body proportions, wardrobe silhouette, garment colors, footwear, "
-                  "and signature accessory in every frame where this character appears. "
+                  "This is an identity reference ONLY, not an instruction to include or center the protagonist. "
+                  "Render the protagonist only when the SCENE BLUEPRINT or narration actually requires that person on screen. "
+                  "When present, preserve the exact face structure, eye design, eyebrow shape, hair shape and color, skin tone, "
+                  "body proportions, wardrobe silhouette, garment colors, footwear, and signature accessory. "
+                  "When absent, do not insert, substitute, silhouette, or cameo the protagonist. "
                   "Do not redesign, age, beautify, simplify, or reinterpret the character. "
               )
 
@@ -983,14 +996,15 @@ jobs:
 
               CONTINUITY_RULES = (
                   "CONTINUITY LOCK — treat this shot as part of one continuous film. "
-                  "Preserve all returning characters, exact faces, hairstyles, clothing silhouettes, garment colors, "
-                  "shoes, accessories, and important object ownership from the story. "
-                  "If the scene blueprint gives a supporting character identity, render that character as a distinct, "
-                  "consistent person and do not substitute the protagonist. "
-                  "Preserve spatial relationships that matter to the action and keep props physically consistent "
-                  "between adjacent scenes. "
-                  "Use the visual_differentiation field to change framing, action, composition, subject focus, "
-                  "or object state rather than changing character design. "
+                  "Preserve every returning character's face, hairstyle, clothing silhouette, garment colors, "
+                  "shoes, accessories, age cues, and distinctive traits exactly as established. "
+                  "If the scene blueprint names or describes a supporting character, render that person as a distinct, "
+                  "consistent individual and never replace them with the protagonist. "
+                  "SCENE CAST RULE — include only the people needed for this beat; the protagonist is not mandatory. "
+                  "SUBJECT OWNERSHIP RULE — whichever person, object, place, clue, or consequence carries the narration "
+                  "must visually own the frame through scale, focus, foreground placement, interaction, or composition. "
+                  "Preserve spatial relationships and important object ownership/state between adjacent scenes. "
+                  "Change framing, action, composition, subject focus, or object state between scenes rather than changing character design. "
               )
 
               shot_variations = [
@@ -1027,9 +1041,11 @@ jobs:
                   + visual_anchor
                   + CONTINUITY_RULES
                   + " MANDATORY SCENE OVERRIDE — depict ONLY the exact scene-specific event below. "
-                    "This is NOT a generic character portrait. Do NOT reuse the previous scene's pose, camera, "
-                    "framing, character lineup, or background composition. The scene-specific action, subject, "
-                    "people, props, and location have priority over generic defaults. "
+                    "This is NOT a generic protagonist portrait. First identify the beat's true visual owner: "
+                    "the active person, interaction, place, clue, object, or consequence. Make that the dominant subject. "
+                    "Do NOT automatically include or center the protagonist. Do NOT reuse the previous scene's pose, camera, "
+                    "framing, character lineup, or background composition. The exact narration, scene-specific action, "
+                    "supporting characters, props, object state, and location override generic character defaults. "
                     "SHOT VARIATION — "
                   + shot_override
                   + ". NARRATION CONTEXT — "
@@ -1037,9 +1053,10 @@ jobs:
                   + " SCENE BLUEPRINT — "
                   + scene["visual_prompt"]
                   + " FINAL SCENE LOCK — the viewer must immediately recognize this as a DIFFERENT STORY BEAT "
-                    "from the previous frame while the locked character design and art style remain identical. "
-                    "Freeze this exact cinematic moment as the keyframe; communicate the cause-and-effect visually "
-                    "even with narration muted."
+                    "from the previous frame while all returning character designs and art style remain identical. "
+                    "Audit the frame against the narration: every important named person, place, object, clue, action, "
+                    "and visible consequence required for this beat must be represented correctly; omit people not needed. "
+                    "Freeze this exact cinematic moment as the keyframe and make the cause-and-effect understandable with narration muted."
               )
 
               encoded = urllib.parse.quote(prompt, safe="")
