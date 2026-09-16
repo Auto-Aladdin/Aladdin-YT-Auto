@@ -93,5 +93,23 @@
     "words": 185,
     "scenes": 9,
     "created_utc": "2026-09-16T04:16:43Z"
+  },
+  {
+    "title": "Ticketed Twist",
+    "premise": "I was buying a train ticket when a stranger slipped a note into my pocket, and I almost missed my stop.",
+    "setting": "crowded train station concourse",
+    "originality_fingerprint": {
+      "premise": "A ticket clerk must decide whether to follow a mysterious note that could alter a commuter’s journey",
+      "conflict": "Moral dilemma of following a stranger’s instruction vs. routine duty",
+      "relationship": "Brief interaction between clerk and passenger",
+      "central_object": "Mysterious note",
+      "escalation": "The note’s instructions lead to a series of missteps",
+      "twist": "The note is actually a safety alert for an emergency on the train",
+      "ending": "Eli’s quick action saves a passenger, earning gratitude and a new perspective",
+      "emotional_flavor": "warm relief"
+    },
+    "words": 176,
+    "scenes": 8,
+    "created_utc": "2026-09-16T06:10:01Z"
   }
 ]
