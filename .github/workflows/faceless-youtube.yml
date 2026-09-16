@@ -288,11 +288,10 @@ jobs:
                       "setting": {"type": "string"},
                       "scenes": {
                           "type": "array",
-                          # Scene count is intentionally NOT constrained here.
-                          # Groq must return the complete JSON object first; our
-                          # deterministic validator applies the adaptive scene-count
-                          # rule afterward. This prevents schema-level HTTP 400 errors
-                          # when the model naturally produces a few more scenes.
+                          # Keep scene count constrained at generation time so a
+                          # short structural miss does not trigger a full repair call.
+                          "minItems": 8,
+                          "maxItems": 10,
                           "items": {
                               "type": "object",
                               "properties": {
@@ -772,8 +771,8 @@ jobs:
                     }}
 
                     SCENE CONTRACT
-                    - Plan 8-10 scenes when practical; never fewer than 7 or more than 16; never pad.
-                    - Target 17-21 narration words per scene; hard range 12-26.
+                    - Produce 8-10 scenes; prefer 8 when sufficient, and use 9-10 only when each added scene creates genuine progression. Never pad.
+                    - Target 18-22 narration words per scene; hard range 12-26.
                     - TOTAL NARRATION TARGET: deliberately aim for 185-205 words so the first generation comfortably clears the validator minimum.
                     - Before returning JSON, silently count the combined scene narration. If below 170 words, naturally enrich the existing scenes with useful cause, consequence, reaction, or sensory detail until the total is 180-205 words. Do NOT add filler or create new scenes just to increase word count.
                     - Every narration is exactly ONE natural spoken sentence.
@@ -797,7 +796,7 @@ jobs:
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
                       prompt,
-                      max_tokens=2800,
+                      max_tokens=2300,
                       temperature=0.65,
                       label=f"story-{call_number}",
                       response_schema=STORY_SCHEMA,
@@ -854,22 +853,19 @@ jobs:
                                       return story
 
                   repair_prompt = f"""
-                    Repair the SAME story so it passes deterministic validation; do not replace the premise with a generic story.
+                    Perform a MINIMAL repair of the SAME story.
 
                     CURRENT PROBLEM: {issue}
 
-                    Keep the same protagonist, relationship, setting, tone, hook, and visual identity unless a minimal correction is necessary. Return the COMPLETE JSON object.
+                    Change only what is necessary to satisfy the validator. Do NOT rewrite the premise,
+                    characters, setting, hook, visual identity, scene order, visual prompts, or payoff.
+                    Keep 8-10 scenes. Keep every scene as ONE natural spoken sentence.
 
-                    HARD CHECKS:
-                    - 7-16 scenes; prefer 8-10; never add filler.
-                    - Every scene has scene, narration, visual_prompt.
-                    - Narration: exactly ONE natural spoken sentence, 12-26 words, target 17-21.
-                    - Total narration MUST be at least 170 words and at most 230 words. Before returning JSON, count all scene narration words. If the total is below 170, expand the existing scenes naturally until it is at least 170; never return an under-170 story.
-                    - Total narration target: 180-210 words when practical, without filler.
-                    - Simple spoken English; concrete actions; no semicolons, em dashes, multiple sentences, literary wording, or vague metaphors.
-                    - Preserve causal flow, strongest hook, character continuity, modest family-friendly wardrobe, and original visual style.
-                    - No banned patterns.
-                    - Before returning JSON, silently re-check scene count, every scene word count, total word count, sentence count, required fields, and valid JSON.
+                    TARGETS:
+                    - 12-26 narration words per scene, target 18-22.
+                    - Total narration 165-230 words, target 185-205.
+                    - Preserve the same causal story, continuity, tone, and visual plan.
+                    - Do not add filler or invent a new plot point just to change word count.
 
                     STORY:
                     {json.dumps(story, ensure_ascii=False)}
@@ -879,7 +875,7 @@ jobs:
 
                   story = groq_json(
                       repair_prompt,
-                      max_tokens=2600,
+                      max_tokens=1700,
                       temperature=0.25,
                       label=f"repair-{call_number}",
                       response_schema=STORY_SCHEMA,
