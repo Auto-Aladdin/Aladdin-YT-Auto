@@ -589,16 +589,17 @@ jobs:
                     - Do not reuse the protagonist's face, body, clothing, or pose as a stand-in for a different named character. Every named character must have a distinct visual identity.
                     - Crowd/background characters must remain generic and must never duplicate the protagonist or any named supporting character.
 
-                    HOOK
-                    Scene 1 MUST feel like a real storyteller has started telling us something that is ALREADY happening.
-                    A normal activity such as walking home, carrying groceries, riding a bus, closing a shop, waiting outside, or heading to work is allowed
-                    ONLY when the sentence immediately introduces the unusual event, problem, discovery, person, object, or decision that changes the moment.
-                    Strong opening pattern: ordinary human action + specific interruption + immediate question or consequence.
-                    Example style only: "Maya was walking home when she noticed a little red suitcase moving by itself near the bus stop."
-                    Do NOT copy that example or reuse its exact structure every time. Create a fresh version appropriate to the story.
-                    The opening must sound natural when spoken aloud, as if a good human storyteller is telling a friend what happened.
-                    Avoid generic weather, scenery, biography, waking up, "one day", abstract suspense, and empty cinematic description.
-                    Do not start with a trailer voice, a quote, a moral, a question addressed directly to the viewer, or exaggerated clickbait.
+                    HOOK + STORYTELLER OPENING
+                    Scene 1 must sound like the FIRST SENTENCE OF A REAL PERSON TELLING AN INTERESTING STORY, not like an image prompt, trailer, synopsis, or puzzle.
+                    The audience should meet the protagonist naturally before the unusual event becomes clear. Use a warm, conversational setup when it fits: introduce the person, what they normally enjoy/do, and then let one specific event interrupt that ordinary moment.
+                    A natural pattern such as "There was a boy named Noah who loved basketball, and one afternoon everything changed when..." is a REFERENCE STYLE only, never a fixed template. Do not repeat that wording or force the same opening structure every time.
+                    Other valid openings can begin with a girl walking home, a man closing his shop, a student heading to practice, a mechanic finishing a job, two friends joking around, or another believable everyday moment.
+                    The key is: PERSON + ORDINARY CONTEXT/PERSONAL DETAIL + SPECIFIC TURNING EVENT + IMMEDIATE CURIOSITY.
+                    Do not jump straight into an unexplained shadow, object, chase, accusation, or abstract mystery unless the audience first understands who is involved and what they were doing.
+                    Do not make every story begin in the exact middle of action; alternate between natural character introductions, ordinary routines interrupted by trouble, relationship-based openings, and immediate-action openings.
+                    The first sentence must still create a reason to keep listening, but the curiosity should come from a clear human situation, not forced clickbait.
+                    The opening must sound effortless when spoken aloud, as if a skilled storyteller is telling a friend what happened.
+                    Avoid generic weather/scenery openings, biography dumps, waking-up clichés, empty suspense, trailer voice, quotes, morals, viewer-directed questions, and repeated "one day" formulas.
 
                     PROFESSIONAL STORY LOGIC
                     - One primary protagonist with clear personality shown through behavior and decisions.
@@ -657,15 +658,20 @@ jobs:
 
                     SCENE-TO-IMAGE CONTRACT
                     For every scene, create the visual_prompt using these exact labeled fields in this order:
-                    SCENE: [specific single frozen moment]
-                    CHARACTER: [full locked character identity; repeat all identity-critical details, not just the name]
-                    ACTION: [one dominant physical action and what is changing]
+                    SCENE: [specific single frozen moment that can be understood without narration]
+                    PRIMARY VISUAL SUBJECT: [the ONE person or object the camera is mainly following in this scene]
+                    ON-SCREEN CHARACTERS: [list EVERY named or story-relevant character who must physically appear in the frame, with a short unique visual identity for each; do not omit a person merely because the protagonist is easier to draw]
+                    CHARACTER: [full locked protagonist identity when the protagonist is present; if the primary subject is a supporting character, put that character's full locked identity first]
+                    ACTION: [one dominant physical action and exactly who is doing it, receiving it, watching it, or reacting to it]
                     LOCATION: [specific environment plus important objects]
                     MOOD: [emotion and atmosphere expressed visually]
-                    CAMERA: [shot size, camera height, angle, lens feel, composition]
+                    CAMERA: [shot size, camera height, angle, lens feel, composition and whose face/body has visual priority]
                     LIGHTING: [key light, color temperature, time/weather, shadows]
-                    CONTINUITY: [exact clothing/prop/appearance details that must match earlier scenes]
-                    Each scene must be a fresh cinematic composition, but character identity and visual universe must remain locked.
+                    CONTINUITY: [exact clothing/prop/appearance details that must match earlier scenes for EVERY returning character and important object]
+                    VISUAL DIFFERENTIATION: [what visibly changes from the previous scene: subject, location, camera, action, character interaction, prop state, or composition]
+                    Each scene must be a genuinely new visual beat, not another portrait of the same character in the same location. Character identity stays locked, but framing, subject, interaction, environment, action, and composition must change when the story changes.
+                    If narration mentions a second character performing an action, receiving an object, being called, arriving, speaking, chasing, warning, passing something, or becoming the reason for the scene, that character MUST be visible and visually important in that scene unless the story intentionally withholds them as a mystery.
+                    If two characters interact, show the interaction itself; do not replace the second character with the protagonist alone.
 
                     IMAGE COMPOSITION RULES
                     - Wardrobe must stay tasteful, modest, practical, and story-appropriate in every generated frame; do not shorten skirts/shorts or alter necklines between scenes.
@@ -730,6 +736,10 @@ jobs:
                     - Never repeat essentially the same action in consecutive scenes.
                     - Never use filler reaction shots with no story function.
                     - VISUAL BEAT OWNERSHIP: Before returning each scene, silently identify WHO the viewer should be watching and WHY. The PRIMARY VISUAL SUBJECT must be the character performing or receiving the action named by the narration.
+                    - SCENE DIFFERENCE CHECK: Compare each scene with the previous one. If the setting, dominant action, primary subject, supporting characters, and camera composition are effectively the same, rewrite the visual beat before returning JSON.
+                    - CHARACTER ENTRY CHECK: Whenever a new named character becomes important, establish that character visually in the scene where they matter, with a distinct face, hairstyle, clothing, body build, and role; do not leave the supporting character only in narration.
+                    - CHARACTER TRANSFER CHECK: When narration transfers attention from the protagonist to a friend, opponent, teammate, customer, sibling, parent, teacher, owner, or other character, transfer the visual focus too. The protagonist must not remain the default subject.
+                    - GROUP CHECK: Background crowds must never contain duplicate copies of the protagonist or named supporting characters. Keep background people generic and visually distinct.
                     - Avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. in narration when possible.
                     - No semicolons, em dashes, or multiple sentence-ending marks inside a scene narration.
               """
@@ -952,7 +962,9 @@ jobs:
                   MASTER_STYLE
                   + visual_anchor
                   + CONTINUITY_RULES
-                  + " VISUAL SUBJECT RULE — the PRIMARY VISUAL SUBJECT named by the scene must be the dominant visible subject; if the narration transfers attention to another named character, visually transfer the focus to that character and do not leave the protagonist as the default focal subject. When two named characters interact, show only the characters required for that interaction and keep any crowd generic and visually distinct. Do not duplicate any named character in the same frame. "
+                  + " VISUAL SUBJECT RULE — obey the scene's PRIMARY VISUAL SUBJECT and ON-SCREEN CHARACTERS fields exactly. The primary subject must be the dominant visible subject. Every named or story-relevant character required by the scene must actually appear as a distinct person when the scene calls for them; do not substitute the protagonist for a friend, opponent, teammate, customer, or other character. If the narration transfers attention to another character, transfer camera focus to that character. When two characters interact, show the physical interaction clearly. Never duplicate a named character, never reuse the protagonist as a crowd member, and never fill the frame with extra versions of the same person. "
+                  + " NARRATION CONTEXT — "
+                  + scene["narration"]
                   + " SCENE BLUEPRINT — "
                   + scene["visual_prompt"]
                   + ", frozen cinematic moment, one dominant physical action, clear cause-and-effect staging, "
