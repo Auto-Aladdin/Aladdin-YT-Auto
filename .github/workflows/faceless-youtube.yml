@@ -541,6 +541,87 @@ jobs:
                   if isinstance(scene, dict) and "narration" in scene:
                       scene["narration"] = normalize_narration(scene["narration"])
 
+          def locally_shorten_story(story):
+              """Surgically reduce narration length without another API call.
+
+              This is only a quota-safe fallback for a small word-count overflow.
+              It never changes scene count, visuals, providers, timing, or pipeline flow.
+              """
+              removable = [
+                  (r"\\bjust\\s+", ""),
+                  (r"\\bsuddenly\\s+", ""),
+                  (r"\\bquickly\\s+", ""),
+                  (r"\\bcasually\\s+", ""),
+                  (r"\\bcarefully\\s+", ""),
+                  (r"\\bquietly\\s+", ""),
+                  (r"\\bfinally\\s+", ""),
+                  (r"\\bsmall\\s+", ""),
+                  (r"\\btiny\\s+", ""),
+                  (r"\\bhuge\\s+", ""),
+                  (r"\\breally\\s+", ""),
+                  (r"\\bvery\\s+", ""),
+                  (r"\\bsimply\\s+", ""),
+                  (r"\\bactually\\s+", ""),
+                  (r"\\bfor a moment\\s*", ""),
+                  (r"\\bin the end\\s*", ""),
+                  (r"\\bwithout any warning\\s*", ""),
+                  (r"\\bstarts to\\s+", ""),
+                  (r"\\bbegins to\\s+", ""),
+                  (r"\\btries to\\s+", ""),
+                  (r"\\bmanages to\\s+", ""),
+                  (r"\\bkeeps on\\s+", "keeps "),
+                  (r"\\bthat was\\s+", "that "),
+                  (r"\\bit was\\s+", "it "),
+                  (r"\\bthere was\\s+", "there's "),
+              ]
+
+              def total_words():
+                  return sum(words(str(s.get("narration", ""))) for s in story.get("scenes", []))
+
+              if total_words() <= MAX_WORDS:
+                  return
+
+              for pattern, replacement in removable:
+                  if total_words() <= MAX_WORDS:
+                      break
+                  for scene in story.get("scenes", []):
+                      narration = str(scene.get("narration", "")).strip()
+                      if not narration:
+                          continue
+                      shortened = re.sub(pattern, replacement, narration, count=1, flags=re.IGNORECASE)
+                      shortened = re.sub(r"\\s{2,}", " ", shortened).strip()
+                      if shortened != narration and words(shortened) >= SCENE_MIN_WORDS:
+                          if shortened[-1:] not in ".!?":
+                              shortened += "."
+                          else:
+                              shortened = shortened[:-1] + "."
+                          scene["narration"] = shortened
+                          if total_words() <= MAX_WORDS:
+                              break
+
+              # Last-resort deterministic trimming is deliberately limited to the
+              # excess amount and only removes trailing words from the longest scene.
+              excess = total_words() - MAX_WORDS
+              while excess > 0:
+                  candidates = [
+                      s for s in story.get("scenes", [])
+                      if words(str(s.get("narration", ""))) > SCENE_MIN_WORDS
+                  ]
+                  if not candidates:
+                      break
+                  scene = max(candidates, key=lambda s: words(str(s.get("narration", ""))))
+                  tokens = str(scene["narration"]).strip().rstrip(".!?").split()
+                  removable_count = min(
+                      excess,
+                      max(0, len(tokens) - SCENE_MIN_WORDS),
+                      3,
+                  )
+                  if removable_count <= 0:
+                      break
+                  tokens = tokens[:-removable_count]
+                  scene["narration"] = " ".join(tokens).rstrip(",;:") + "."
+                  excess = total_words() - MAX_WORDS
+
           def validate_story(story):
               if not isinstance(story, dict):
                   return "Story is not an object."
@@ -878,7 +959,7 @@ jobs:
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
                       prompt,
-                      max_tokens=2200,
+                      max_tokens=1800,
                       temperature=0.65,
                       label=f"story-{call_number}",
                       response_schema=STORY_SCHEMA,
@@ -890,6 +971,15 @@ jobs:
                       return story
 
                   print(f"[validator] {issue}", flush=True)
+
+                  if issue.startswith("Story is too long at "):
+                      locally_shorten_story(story)
+                      normalize_story_narrations(story)
+                      local_issue = validate_story(story)
+                      if not local_issue:
+                          print("[validator] length overflow fixed locally; skipping Groq repair call.", flush=True)
+                          return story
+                      print(f"[validator] local length fix did not fully resolve: {local_issue}", flush=True)
 
                   repair_prompt = f"""
                     Repair the SAME story so it passes deterministic validation; do not replace the premise with a generic story.
