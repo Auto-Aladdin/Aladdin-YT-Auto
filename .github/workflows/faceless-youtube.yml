@@ -25,11 +25,14 @@ jobs:
       - name: Generate story, images, voice and video
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
+          LLM7_API_KEY: ${{ secrets.LLM7_API_KEY }}
           POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
         run: |
           set -euo pipefail
           python3 -u - <<'PY'
+          import hashlib
           import json
+          import math
           import os
           import random
           import re
@@ -45,7 +48,7 @@ jobs:
           # MISSION
           # ============================================================
           # One daily faceless motivational/emotional Short:
-          # story -> scene image -> free TTS -> motion video
+          # story -> scene image -> free TTS -> captions -> motion video
           #
           # Designed for GitHub Actions so the user's computer does not
           # need to stay online.
@@ -54,16 +57,20 @@ jobs:
           API_URL = "https://api.groq.com/openai/v1/chat/completions"
           MODEL = "openai/gpt-oss-20b"
 
+          # Backup LLM7.io gateway (OpenAI-compatible).
+          BACKUP_API_URL = "https://api.llm7.io/v1/chat/completions"
+          BACKUP_MODEL = "gemini-3.1-flash-lite"
+
           ROOT = Path(".")
           OUT = ROOT / "short-output"
           ASSETS = OUT / "assets"
           IMAGES = ASSETS / "images"
           SCENES = ASSETS / "clips"
-          TIMING_SRT = Path("/tmp/tts_scene_timing.srt")
 
           HISTORY_FILE = ROOT / ".github" / "data" / "story_history.json"
 
           API_KEY = os.environ["GROQ_API_KEY"]
+          BACKUP_API_KEY = os.environ.get("LLM7_API_KEY", "").strip()
 
           MIN_WORDS = 165
           MAX_WORDS = 230
@@ -107,13 +114,6 @@ jobs:
               "a competitive challenge where the obvious winning strategy is the trap",
               "an everyday rule that creates an unusual but logical consequence",
               "a near-mistake that reveals what was actually happening",
-              "a promise made carelessly that becomes surprisingly costly to keep",
-              "a shortcut that works fine until it quietly creates a bigger problem",
-              "two strangers who need the same scarce thing at the same moment",
-              "a well-meant warning that turns out to rest on a wrong assumption",
-              "a skill nobody respected turning out to be exactly what the moment needs",
-              "a favor returned in a way nobody expected",
-              "a small lie that has to be maintained through an inconvenient test",
           ]
 
           SETTINGS = [
@@ -137,13 +137,6 @@ jobs:
               "small bicycle repair shop",
               "city bus depot",
               "apartment rooftop laundry area",
-              "late-night laundromat",
-              "downtown parking garage",
-              "community garden plot",
-              "small print shop",
-              "corner hardware store",
-              "neighborhood barbershop",
-              "shared co-working space",
           ]
 
           EMOTIONS = [
@@ -162,11 +155,6 @@ jobs:
               "embarrassment turning into relief",
               "gentle irony",
               "high-stakes focus without melodrama",
-              "restrained anger giving way to clarity",
-              "nervous excitement",
-              "bittersweet acceptance",
-              "stubborn pride softening",
-              "quiet vindication",
           ]
 
           HOOK_MODES = [
@@ -179,8 +167,6 @@ jobs:
               "begin with a character noticing that something is out of place in an ordinary environment",
               "open with a simple task that becomes unexpectedly difficult for a concrete reason",
               "start with a confident choice that immediately creates a new problem",
-              "open mid-conversation so the audience catches up through context, not exposition",
-              "begin with a character breaking their own rule for a specific, understandable reason",
           ]
 
           TWIST_MODES = [
@@ -194,8 +180,6 @@ jobs:
               "an earlier small choice changes the meaning of the final scene",
               "the opening detail returns in a new context and explains what really happened",
               "the apparent loss turns out to have prevented a larger problem",
-              "the character's greatest strength is also the source of the problem",
-              "what looked like an obstacle was actually a test set up by someone else",
           ]
 
           ENDING_MODES = [
@@ -208,8 +192,6 @@ jobs:
               "a small victory that reveals what the character actually valued",
               "a satisfying reversal where the audience realizes the clue was visible all along",
               "an understated final beat that lets the situation speak for itself",
-              "a bittersweet trade-off that still feels like the right call",
-              "a wry final beat delivered through action rather than a spoken line",
           ]
 
           BANNED = [
@@ -284,19 +266,9 @@ jobs:
                   return []
 
           history = load_history()
-          # 15 recent entries is enough for the model to spot a repeated premise;
-          # the full hook sentence isn't needed for that, just its gist, so it's
-          # trimmed to keep this recurring block of the prompt lean.
-          recent = history[-15:]
-
-          def _gist(text, max_words=10):
-              words_list = str(text).split()
-              if len(words_list) <= max_words:
-                  return str(text).strip()
-              return " ".join(words_list[:max_words]) + "…"
-
+          recent = history[-20:]
           recent_text = "\n".join(
-              f"- {x.get('title','')} | {_gist(x.get('premise',''))} | {x.get('setting','')}"
+              f"- {x.get('title','')} | {x.get('premise','')} | {x.get('setting','')}"
               for x in recent
           ) or "NONE"
 
@@ -345,15 +317,46 @@ jobs:
               }
           }
 
-          def groq_json(prompt, max_tokens=2000, temperature=0.55, label="groq", response_schema=None):
-              global last_call
+          # ------------------------------------------------------------
+          # Token-aware LLM dispatcher
+          #
+          # Primary: Groq gpt-oss-20b
+          # Backup:  LLM7.io Gemini 3.1 Flash Lite
+          #
+          # Groq does not expose daily TPD remaining in normal success
+          # headers, so we combine a conservative in-run guard with
+          # immediate failover on explicit daily-limit responses.
+          # ------------------------------------------------------------
 
-              gap = time.monotonic() - last_call
-              if gap < MIN_GAP:
-                  time.sleep(MIN_GAP - gap)
+          groq_tokens_used_this_run = 0
+          groq_tpd_safe_budget = 160000
+          primary_disabled_for_run = False
 
+          def estimate_tokens(text):
+              # Conservative approximation for English/JSON. We intentionally
+              # overestimate a little to switch before the hard daily ceiling.
+              return max(1, math.ceil(len(text) / 4.0))
+
+          def parse_provider_usage(data):
+              usage = data.get("usage") if isinstance(data, dict) else None
+              if not isinstance(usage, dict):
+                  return 0
+              try:
+                  return int(usage.get("total_tokens") or 0)
+              except Exception:
+                  return 0
+
+          def groq_daily_exhausted(raw):
+              low = raw.lower()
+              return (
+                  "tokens per day" in low
+                  or "(tpd)" in low
+                  or ("rate_limit_exceeded" in low and "200000" in low)
+              )
+
+          def make_payload(model, prompt, max_tokens, temperature, response_schema, backup=False):
               payload = {
-                  "model": MODEL,
+                  "model": model,
                   "messages": [
                       {
                           "role": "system",
@@ -365,99 +368,263 @@ jobs:
                       },
                       {"role": "user", "content": prompt},
                   ],
-                  "reasoning_effort": "low",
-                  "include_reasoning": False,
                   "temperature": temperature,
-                  "max_completion_tokens": max_tokens,
-                  "response_format": (
-                      {
-                          "type": "json_schema",
-                          "json_schema": {
-                              "name": response_schema["name"],
-                              "strict": True,
-                              "schema": response_schema["schema"],
-                          },
-                      }
-                      if response_schema
-                      else {"type": "json_object"}
-                  ),
               }
 
-              for attempt in range(1, MAX_RETRIES + 1):
-                  last_call = time.monotonic()
+              if response_schema and not backup:
+                  payload["reasoning_effort"] = "low"
+                  payload["include_reasoning"] = False
+                  payload["max_completion_tokens"] = max_tokens
+                  payload["response_format"] = {
+                      "type": "json_schema",
+                      "json_schema": {
+                          "name": response_schema["name"],
+                          "strict": True,
+                          "schema": response_schema["schema"],
+                      },
+                  }
+              else:
+                  payload["max_tokens"] = max_tokens
+                  payload["response_format"] = {"type": "json_object"}
+
+              return payload
+
+          class ProviderHTTPError(RuntimeError):
+              def __init__(self, provider, code, raw):
+                  self.provider = provider
+                  self.code = code
+                  self.raw = raw
+                  super().__init__(f"{provider} HTTP {code}: {raw}")
+
+          def post_json(url, key, payload, provider_name):
+              req = urllib.request.Request(
+                  url,
+                  data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+                  headers={
+                      "Authorization": f"Bearer {key}",
+                      "Content-Type": "application/json",
+                      "Accept": "application/json",
+                      "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V1",
+                  },
+                  method="POST",
+              )
+
+              started = time.monotonic()
+              try:
+                  with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
+                      data = json.loads(r.read().decode("utf-8"))
+                      headers = {k.lower(): v for k, v in r.headers.items()}
+                  return data, headers, time.monotonic() - started
+              except urllib.error.HTTPError as exc:
+                  raw = exc.read().decode("utf-8", errors="replace")
+                  raise ProviderHTTPError(provider_name, exc.code, raw) from exc
+
+          def run_provider_request(
+              provider_name,
+              url,
+              key,
+              model,
+              prompt,
+              max_tokens,
+              temperature,
+              label,
+              response_schema,
+              backup=False,
+          ):
+              global last_call, groq_tokens_used_this_run, primary_disabled_for_run
+
+              gap = time.monotonic() - last_call
+              if gap < MIN_GAP:
+                  time.sleep(MIN_GAP - gap)
+
+              estimate = estimate_tokens(prompt) + max_tokens
+
+              if provider_name == "Groq":
+                  if (
+                      primary_disabled_for_run
+                      or groq_tokens_used_this_run + estimate > groq_tpd_safe_budget
+                  ):
+                      raise ProviderHTTPError(
+                          "Groq",
+                          429,
+                          "Local proactive TPD guard: estimated request would exceed the safe Groq budget for this run.",
+                      )
+
+              payload = make_payload(
+                  model,
+                  prompt,
+                  max_tokens,
+                  temperature,
+                  response_schema,
+                  backup=backup,
+              )
+
+              print(
+                  f"[{provider_name}] {label} estimated request tokens ≈ {estimate}",
+                  flush=True,
+              )
+              print(f"[{provider_name}] {label} attempt 1/2", flush=True)
+
+              last_call = time.monotonic()
+
+              try:
+                  data, headers, elapsed = post_json(
+                      url, key, payload, provider_name
+                  )
+
+                  content = data["choices"][0]["message"].get("content", "")
+                  if not content:
+                      raise RuntimeError(f"{provider_name} returned empty content.")
+
+                  try:
+                      obj = json.loads(content)
+                  except json.JSONDecodeError as exc:
+                      raise RuntimeError(
+                          f"{provider_name} returned invalid JSON: {exc}"
+                      ) from exc
+
+                  if isinstance(obj, list) and len(obj) == 1 and isinstance(obj[0], dict):
+                      obj = obj[0]
+
+                  if not isinstance(obj, dict):
+                      raise RuntimeError(
+                          f"{label} must return a JSON object, got {type(obj).__name__}"
+                      )
+
+                  actual_tokens = parse_provider_usage(data)
+                  if provider_name == "Groq":
+                      groq_tokens_used_this_run += (
+                          actual_tokens if actual_tokens > 0 else estimate
+                      )
+                      remaining_tpm = headers.get("x-ratelimit-remaining-tokens")
+                      if remaining_tpm:
+                          print(
+                              f"[Groq] {label} TPM remaining: {remaining_tpm}",
+                              flush=True,
+                          )
 
                   print(
-                      f"[Groq] {label} attempt {attempt}/{MAX_RETRIES}",
+                      f"[{provider_name}] {label} success in {elapsed:.2f}s "
+                      f"(usage={actual_tokens or 'unknown'} tokens)",
+                      flush=True,
+                  )
+                  return obj
+
+              except ProviderHTTPError as exc:
+                  print(
+                      f"[{exc.provider}] HTTP {exc.code} {label}",
                       flush=True,
                   )
 
-                  req = urllib.request.Request(
+                  if exc.provider == "Groq" and exc.code == 429 and groq_daily_exhausted(exc.raw):
+                      primary_disabled_for_run = True
+                      raise
+
+                  if exc.code == 429:
+                      time.sleep(2.0)
+                      try:
+                          retry_data, retry_headers, retry_elapsed = post_json(
+                              url, key, payload, provider_name
+                          )
+                          retry_content = retry_data["choices"][0]["message"].get("content", "")
+                          if not retry_content:
+                              raise RuntimeError(
+                                  f"{provider_name} returned empty content on retry."
+                              )
+
+                          try:
+                              retry_obj = json.loads(retry_content)
+                          except json.JSONDecodeError as retry_exc:
+                              raise RuntimeError(
+                                  f"{provider_name} returned invalid JSON on retry: {retry_exc}"
+                              ) from retry_exc
+
+                          if isinstance(retry_obj, list) and len(retry_obj) == 1 and isinstance(retry_obj[0], dict):
+                              retry_obj = retry_obj[0]
+
+                          if not isinstance(retry_obj, dict):
+                              raise RuntimeError(
+                                  f"{label} retry returned non-object JSON."
+                              )
+
+                          actual_tokens = parse_provider_usage(retry_data)
+                          if provider_name == "Groq":
+                              groq_tokens_used_this_run += (
+                                  actual_tokens if actual_tokens > 0 else estimate
+                              )
+
+                          print(
+                              f"[{provider_name}] {label} retry success in {retry_elapsed:.2f}s "
+                              f"(usage={actual_tokens or 'unknown'} tokens)",
+                              flush=True,
+                          )
+                          return retry_obj
+                      except ProviderHTTPError:
+                          raise
+
+                  raise
+
+          def groq_json(
+              prompt,
+              max_tokens=2000,
+              temperature=0.55,
+              label="groq",
+              response_schema=None,
+          ):
+              # Primary Groq first, automatic LLM7 failover only when the
+              # primary is unavailable because of TPD/proactive quota guarding.
+              try:
+                  return run_provider_request(
+                      "Groq",
                       API_URL,
-                      data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
-                      headers={
-                          "Authorization": f"Bearer {API_KEY}",
-                          "Content-Type": "application/json",
-                          "Accept": "application/json",
-                          "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V1",
-                      },
-                      method="POST",
+                      API_KEY,
+                      MODEL,
+                      prompt,
+                      max_tokens,
+                      temperature,
+                      label,
+                      response_schema,
+                      backup=False,
+                  )
+              except Exception as primary_exc:
+                  should_fallback = (
+                      isinstance(primary_exc, ProviderHTTPError)
+                      and primary_exc.provider == "Groq"
+                      and (
+                          groq_daily_exhausted(primary_exc.raw)
+                          or "proactive TPD guard" in primary_exc.raw
+                      )
                   )
 
-                  started = time.monotonic()
+                  if not should_fallback:
+                      raise
 
-                  try:
-                      with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
-                          data = json.loads(r.read().decode("utf-8"))
+                  if not BACKUP_API_KEY:
+                      raise RuntimeError(
+                          "Groq is unavailable because of its daily token budget, "
+                          "and LLM7_API_KEY is not configured. "
+                          "Add GitHub secret LLM7_API_KEY for automatic backup.\n"
+                          + str(primary_exc)
+                      ) from primary_exc
 
-                      content = data["choices"][0]["message"].get("content", "")
-                      if not content:
-                          raise RuntimeError("Groq returned empty content.")
+                  print(
+                      f"[Fallback] Groq unavailable for {label}; switching to "
+                      f"LLM7.io {BACKUP_MODEL}.",
+                      flush=True,
+                  )
 
-                      try:
-                          obj = json.loads(content)
-                      except json.JSONDecodeError as exc:
-                          raise RuntimeError(f"Groq returned invalid JSON: {exc}") from exc
-
-                      if isinstance(obj, list) and len(obj) == 1 and isinstance(obj[0], dict):
-                          obj = obj[0]
-
-                      if not isinstance(obj, dict):
-                          raise RuntimeError(
-                              f"{label} must return a JSON object, got {type(obj).__name__}"
-                          )
-
-                      print(
-                          f"[Groq] {label} success in {time.monotonic()-started:.2f}s",
-                          flush=True,
-                      )
-                      return obj
-
-                  except urllib.error.HTTPError as exc:
-                      raw = exc.read().decode("utf-8", errors="replace")
-                      elapsed = time.monotonic() - started
-                      print(
-                          f"[Groq] HTTP {exc.code} {label} after {elapsed:.2f}s",
-                          flush=True,
-                      )
-
-                      if exc.code == 429:
-                          low = raw.lower()
-                          if "tokens per day" in low or "(tpd)" in low:
-                              raise RuntimeError(
-                                  "Groq daily token limit reached. "
-                                  "Wait for the quota reset before rerunning.\n"
-                                  + raw
-                              ) from exc
-
-                          if attempt < MAX_RETRIES:
-                              time.sleep(2.0 * attempt)
-                              continue
-
-                      if exc.code in (408, 409, 425, 500, 502, 503, 504) and attempt < MAX_RETRIES:
-                          time.sleep(2.0 * attempt)
-                          continue
-
-                      raise RuntimeError(f"Groq HTTP {exc.code}: {raw}") from exc
+                  return run_provider_request(
+                      "LLM7",
+                      BACKUP_API_URL,
+                      BACKUP_API_KEY,
+                      BACKUP_MODEL,
+                      prompt,
+                      min(max_tokens, 1800),
+                      temperature,
+                      label,
+                      response_schema,
+                      backup=True,
+                  )
 
           def banned(text):
               lower = text.lower()
@@ -608,23 +775,6 @@ jobs:
               return None
 
           def create_story():
-              # Named once so the same emotional flavor can also steer the
-              # narrator's delivery (pacing/pitch) later, without a second
-              # random draw or any extra Groq call.
-              chosen_domain = random.choice(DOMAINS)
-              chosen_setting = random.choice(SETTINGS)
-              chosen_emotion = random.choice(EMOTIONS)
-              chosen_hook_mode = random.choice(HOOK_MODES)
-              chosen_twist_mode = random.choice(TWIST_MODES)
-              chosen_ending_mode = random.choice(ENDING_MODES)
-
-              def finalize(s):
-                  # Tag the finished story with the emotional flavor it was
-                  # written around, so the TTS step can match delivery
-                  # (pacing/pitch) to the story's actual tone.
-                  s["_narration_style"] = chosen_emotion
-                  return s
-
               prompt = f"""
                     ROLE
                     You are the showrunner, head writer, storyboard director, and visual-continuity supervisor
@@ -682,8 +832,6 @@ jobs:
                     on first listen. Use concrete names/actions early, with varied short-to-medium rhythm.
                     Each scene narration is ONE sentence. Narrate what the storyteller adds beyond the image:
                     reason, surprise, clue, consequence, or emotional meaning. Do not narrate every visible movement.
-                    Favor one specific noun, number, or named object over a vague generality wherever it fits naturally
-                    ("the third booth by the window" beats "a nearby table"); specificity is what makes a story feel real.
                     Avoid stiff/essay language, generic inspiration, fake suspense, "you won't believe", "watch until the end",
                     "life lesson", "moral of the story", and repetitive catchphrases.
 
@@ -751,6 +899,17 @@ jobs:
                     magic, miracles, or traumatic shock bait. Non-graphic tension, danger, crime-like situations,
                     weapons, or chase elements may exist when story-relevant, but never provide instructions for wrongdoing/harm.
 
+                    DIVERSIFIERS — INGREDIENTS, NOT TEMPLATES
+                    Domain: {random.choice(DOMAINS)}
+                    Setting: {random.choice(SETTINGS)}
+                    Emotional flavor: {random.choice(EMOTIONS)}
+                    Hook mode: {random.choice(HOOK_MODES)}
+                    Twist mode: {random.choice(TWIST_MODES)}
+                    Ending mode: {random.choice(ENDING_MODES)}
+
+                    RECENT HISTORY
+                    {recent_text}
+
                     FINAL CHECK BEFORE JSON
                     Verify: specific/original premise; active protagonist; visible goal + obstacle; meaningful progression;
                     real setback/reversal; earned payoff; natural opening; distinct/locked characters; distinct visual beats;
@@ -792,17 +951,6 @@ jobs:
                     - Establish important new characters visually when they matter; transfer camera focus when attention transfers.
                     - Background crowds never duplicate named characters.
                     - Avoid Mr./Mrs./Ms./Dr./St. in narration when possible; no semicolons, em dashes, or multiple sentence-ending marks.
-
-                    DIVERSIFIERS — INGREDIENTS, NOT TEMPLATES, FOR THIS EPISODE ONLY
-                    Domain: {chosen_domain}
-                    Setting: {chosen_setting}
-                    Emotional flavor: {chosen_emotion}
-                    Hook mode: {chosen_hook_mode}
-                    Twist mode: {chosen_twist_mode}
-                    Ending mode: {chosen_ending_mode}
-
-                    RECENT HISTORY — DO NOT REPEAT THESE PREMISES/STRUCTURES
-                    {recent_text}
               """
 
 
@@ -818,7 +966,7 @@ jobs:
                   normalize_story_narrations(story)
                   issue = validate_story(story)
                   if not issue:
-                      return finalize(story)
+                      return story
 
                   print(f"[validator] {issue}", flush=True)
 
@@ -876,7 +1024,7 @@ jobs:
                                       f"[validator] fixed {shortfall}-word shortfall locally; no repair call used.",
                                       flush=True,
                                   )
-                                  return finalize(story)
+                                  return story
 
                   repair_prompt = f"""
                     Perform a MINIMAL repair of the SAME story.
@@ -910,7 +1058,7 @@ jobs:
                   normalize_story_narrations(story)
                   issue = validate_story(story)
                   if not issue:
-                      return finalize(story)
+                      return story
 
                   print(f"[repair-validator] {issue}", flush=True)
 
@@ -945,42 +1093,8 @@ jobs:
           # ============================================================
           # FREE TTS: edge-tts
           # ============================================================
-          # One consistent narrator voice keeps the channel's identity
-          # recognizable across episodes (per the brief: consistent identity
-          # is fine, identical *content* is not). What changes per-episode is
-          # delivery: rate and pitch are tuned to the story's own emotional
-          # flavor so a tense story is told differently than a warm or funny
-          # one, without a second voice model or any extra API call.
 
           voice = "en-US-ChristopherNeural"
-
-          NARRATION_DELIVERY = {
-              "curiosity with quiet tension": ("+0%", "+0Hz"),
-              "playful awkwardness": ("+4%", "+15Hz"),
-              "contained suspense": ("-6%", "-15Hz"),
-              "warm relief": ("-2%", "+0Hz"),
-              "surprise": ("+6%", "+20Hz"),
-              "earned determination": ("+2%", "-5Hz"),
-              "wonder": ("-4%", "+10Hz"),
-              "pressure and uncertainty": ("-4%", "-10Hz"),
-              "dry humor": ("+0%", "-5Hz"),
-              "earned trust": ("-2%", "+0Hz"),
-              "quiet emotional impact": ("-8%", "-5Hz"),
-              "clever triumph": ("+4%", "+10Hz"),
-              "embarrassment turning into relief": ("+0%", "+5Hz"),
-              "gentle irony": ("+0%", "-5Hz"),
-              "high-stakes focus without melodrama": ("+2%", "-5Hz"),
-              "restrained anger giving way to clarity": ("-2%", "-10Hz"),
-              "nervous excitement": ("+6%", "+15Hz"),
-              "bittersweet acceptance": ("-6%", "-5Hz"),
-              "stubborn pride softening": ("-2%", "-5Hz"),
-              "quiet vindication": ("-4%", "+0Hz"),
-          }
-          DEFAULT_DELIVERY = ("+0%", "+0Hz")
-
-          narration_rate, narration_pitch = NARRATION_DELIVERY.get(
-              story.get("_narration_style", ""), DEFAULT_DELIVERY
-          )
 
           run_cmd([
               sys.executable,
@@ -989,19 +1103,13 @@ jobs:
               "--voice",
               voice,
               "--rate",
-              narration_rate,
-              "--pitch",
-              narration_pitch,
+              "+0%",
               "--text",
               script,
               "--write-media",
               str(OUT / "voice.mp3"),
               "--write-subtitles",
-              # This subtitle file is used only internally to detect each
-              # sentence's start time so scene images stay in sync with the
-              # narration; it is written outside short-output/ so no caption
-              # file is produced in the final deliverable.
-              str(TIMING_SRT),
+              str(OUT / "captions.srt"),
           ], timeout=180)
 
           # ============================================================
@@ -1103,9 +1211,7 @@ jobs:
                   "cinematic palette; coherent warm/cool color harmony; nuanced skin and fabric rendering; "
                   "believable environments; accurate perspective; strong foreground/midground/background depth; "
                   "atmospheric light; realistic cast and contact shadows; polished storytelling detail; "
-                  "premium animated-film composition with a handcrafted illustrated feel; subtle filmic color grading; "
-                  "gentle lens depth-of-field falloff on background elements; soft rim light separating subject from "
-                  "background; light painterly grain texture, never digital noise or artifact-like grain. "
+                  "premium animated-film composition with a handcrafted illustrated feel. "
                   "Every frame must look like it was made by the same artist, with the same character design language, "
                   "linework, proportions, brush texture, shading behavior, color grading, and visual imagination. "
                   "No photorealism, live action, 3D CGI, anime, manga, chibi, flat vector, generic AI cartoon, "
@@ -1119,39 +1225,54 @@ jobs:
                   "If the scene blueprint gives a supporting character identity, render that character as a distinct, "
                   "consistent person and do not substitute the protagonist. "
                   "Preserve spatial relationships that matter to the action and keep props physically consistent "
-                  "between adjacent scenes. Keep the overall color grade and lighting language of this film consistent "
-                  "scene to scene, adjusting only the specific light source called for by this scene's mood/time/weather. "
+                  "between adjacent scenes. "
                   "Use the visual_differentiation field to change framing, action, composition, subject focus, "
                   "or object state rather than changing character design. "
+              )
+
+              shot_variations = [
+                  "wide establishing composition with environmental storytelling and action clearly readable",
+                  "medium action composition with the active character and important object clearly visible",
+                  "over-the-shoulder interaction shot showing what the character is seeing and doing",
+                  "close-to-medium clue shot with the important prop or action emphasized in the foreground",
+                  "dynamic side-angle composition with visible movement and strong depth",
+                  "two-shot interaction composition when two characters physically share the beat",
+                  "profile or three-quarter action composition emphasizing the decisive physical action",
+                  "reveal composition exposing the key visual information while keeping the character readable",
+                  "payoff composition with a strong visual callback to an earlier object, place, or action",
+                  "fresh environmental angle clearly different from the previous frame",
+              ]
+              shot_override = shot_variations[(index - 1) % len(shot_variations)]
+
+              # Stable, scene-specific seed: same story is reproducible, but every
+              # scene receives its own deterministic generation state.
+              seed_material = (
+                  f"{story['title']}|scene-{index}|"
+                  f"{scene['narration']}|{scene['visual_prompt']}"
+              )
+              seed = int(
+                  hashlib.sha256(seed_material.encode("utf-8")).hexdigest()[:8],
+                  16,
               )
 
               prompt = (
                   MASTER_STYLE
                   + visual_anchor
                   + CONTINUITY_RULES
-                  + " SHOT DIRECTOR — obey the SCENE, PRIMARY VISUAL SUBJECT, ON-SCREEN CHARACTERS, ACTION, "
-                    "LOCATION, MOOD, CAMERA, LIGHTING, CONTINUITY, and VISUAL DIFFERENTIATION fields exactly. "
-                    "The primary visual subject must dominate the frame because they are the reason this shot exists. "
-                    "Every character named as physically present must actually appear as a distinct person. "
-                    "If two characters interact, make their physical relationship immediately readable. "
-                    "Do not hide the acting character behind furniture or make them a tiny background figure. "
-                    "Do not default to a centered portrait. Stage a specific cinematic moment with a readable action, "
-                    "purposeful body language, clear eye-lines, believable hands, grounded feet, natural weight, "
-                    "and an obvious relationship between foreground, subject, and background. "
-                    "Prefer film grammar: wide establishing shot, medium action shot, over-the-shoulder, two-shot, "
-                    "close-up of a clue, low angle, high angle, profile, tracking-style composition, or environmental shot "
-                    "as appropriate to the scene. Choose the shot based on story function rather than repeating one angle. "
-                    "Use depth layers and foreground framing to create richness without clutter. "
-                    "Keep the important action in the safe vertical 9:16 area. "
-                    "Avoid duplicated people, repeated protagonist faces in crowds, extra limbs, fused fingers, broken wrists, "
-                    "twisted necks, incorrect joints, floating props, mirrored anatomy, inconsistent clothing, random text, "
-                    "logos, watermarks, UI elements, borders, and meaningless background action. "
-                    "NARRATION CONTEXT — "
+                  + " MANDATORY SCENE OVERRIDE — depict ONLY the exact scene-specific event below. "
+                    "This is NOT a generic character portrait. Do NOT reuse the previous scene's pose, camera, "
+                    "framing, character lineup, or background composition. The scene-specific action, subject, "
+                    "people, props, and location have priority over generic defaults. "
+                    "SHOT VARIATION — "
+                  + shot_override
+                  + ". NARRATION CONTEXT — "
                   + scene["narration"]
                   + " SCENE BLUEPRINT — "
                   + scene["visual_prompt"]
-                  + " FREEZE this exact moment as a polished animation keyframe. "
-                    "The image must communicate the scene's cause-and-effect visually even with the narration muted."
+                  + " FINAL SCENE LOCK — the viewer must immediately recognize this as a DIFFERENT STORY BEAT "
+                    "from the previous frame while the locked character design and art style remain identical. "
+                    "Freeze this exact cinematic moment as the keyframe; communicate the cause-and-effect visually "
+                    "even with narration muted."
               )
 
               encoded = urllib.parse.quote(prompt, safe="")
@@ -1159,6 +1280,7 @@ jobs:
                   POLLINATIONS_BASE
                   + encoded
                   + f"?model=flux&width={IMAGE_WIDTH}&height={IMAGE_HEIGHT}"
+                  + f"&seed={seed}"
                   + "&nologo=true"
               )
 
@@ -1183,7 +1305,7 @@ jobs:
               ss, ms = rest.split(",", 1)
               return int(hh) * 3600 + int(mm) * 60 + int(ss) + int(ms) / 1000.0
 
-          raw_srt = TIMING_SRT.read_text(encoding="utf-8")
+          raw_srt = (OUT / "captions.srt").read_text(encoding="utf-8")
           blocks = re.split(r"\n\s*\n", raw_srt.strip()) if raw_srt.strip() else []
           caption_items = []
           for block in blocks:
@@ -1208,6 +1330,78 @@ jobs:
           for i, start in enumerate(scene_starts):
               next_start = scene_starts[i + 1] if i + 1 < len(scene_starts) else audio_duration
               durations.append(max(0.05, next_start - start))
+
+          # Normalize and rewrite the captions so the final video has exactly
+          # one non-overlapping subtitle cue per scene.
+          normalized_blocks = []
+
+          def srt_time(seconds):
+              millis = max(0, int(round(seconds * 1000)))
+              hh = millis // 3600000
+              millis %= 3600000
+              mm = millis // 60000
+              millis %= 60000
+              ss = millis // 1000
+              ms = millis % 1000
+              return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
+
+          running = 0.0
+          for i, (_, _, text) in enumerate(caption_items):
+              start = running
+              end = running + durations[i]
+              running = end
+              normalized_blocks.append(
+                  f"{i + 1}\n{srt_time(start)} --> {srt_time(end)}\n{text}"
+              )
+
+          (OUT / "captions.srt").write_text(
+              "\n\n".join(normalized_blocks) + "\n",
+              encoding="utf-8",
+          )
+
+          # Build a dedicated ASS track so subtitle size and vertical position
+          # are deterministic on the 1080x1920 Shorts canvas.
+          def ass_time(seconds):
+              total_cs = max(0, int(round(seconds * 100)))
+              hh = total_cs // 360000
+              total_cs %= 360000
+              mm = total_cs // 6000
+              total_cs %= 6000
+              ss = total_cs // 100
+              cs = total_cs % 100
+              return f"{hh}:{mm:02d}:{ss:02d}.{cs:02d}"
+
+          def ass_escape(text):
+              return str(text).replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("\n", " ")
+
+          ass_lines = [
+              "[Script Info]",
+              "ScriptType: v4.00+",
+              "PlayResX: 1080",
+              "PlayResY: 1920",
+              "ScaledBorderAndShadow: yes",
+              "WrapStyle: 0",
+              "YCbCr Matrix: TV.709",
+              "",
+              "[V4+ Styles]",
+              "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
+              "Style: Shorts,DejaVu Sans,32,&H00FFFFFF,&H00FFFFFF,&H90000000,&H70000000,0,0,0,0,100,100,0,0,3,2,0,2,80,80,210,1",
+              "",
+              "[Events]",
+              "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
+          ]
+
+          for i, (_, _, text) in enumerate(caption_items):
+              start = 0.0 if i == 0 else sum(durations[:i])
+              end = start + durations[i]
+              ass_lines.append(
+                  f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Shorts,,0,0,0,,{ass_escape(text)}"
+              )
+
+          (OUT / "captions.ass").write_text(
+              "\n".join(ass_lines) + "\n",
+              encoding="utf-8",
+          )
 
           for i, (scene, duration) in enumerate(
               zip(story["scenes"], durations),
@@ -1321,7 +1515,7 @@ jobs:
           print("Title:", story["title"], flush=True)
           print("Scenes:", len(story["scenes"]), flush=True)
           print("Words:", words(script), flush=True)
-          print("Voice:", voice, f"(rate {narration_rate}, pitch {narration_pitch})", flush=True)
+          print("Voice:", voice, flush=True)
           print("Video:", final_video, flush=True)
           PY
 
