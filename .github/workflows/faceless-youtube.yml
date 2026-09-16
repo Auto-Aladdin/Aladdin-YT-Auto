@@ -582,6 +582,12 @@ jobs:
                     The structure may bend when a stronger story needs it, but nothing may feel like filler.
                     Every 1-2 scenes must introduce a meaningful change in information, risk, plan, location, relationship, object, or consequence.
                     At least one attempt should fail or create a worse problem. The protagonist must actively influence what happens.
+                    - Every scene must have ONE clearly identified PRIMARY VISUAL SUBJECT: the person or object whose action is the focus of that scene. The visual_prompt must make this subject explicit.
+                    - When narration says the protagonist calls, warns, spots, follows, passes something to, hands something to, speaks to, or waits for another character, the next visual beat must visually introduce or focus on that other character as the PRIMARY VISUAL SUBJECT when that character is the reason the scene exists. Do not keep showing the protagonist alone for a beat that is actually about the other character.
+                    - When an action transfers from one character to another, transfer the camera focus with it: show the receiving character clearly, or show both characters only when the interaction itself is the important visual action.
+                    - Do not place the PRIMARY VISUAL SUBJECT as a tiny background figure while another character occupies the visual focus.
+                    - Do not reuse the protagonist's face, body, clothing, or pose as a stand-in for a different named character. Every named character must have a distinct visual identity.
+                    - Crowd/background characters must remain generic and must never duplicate the protagonist or any named supporting character.
 
                     HOOK
                     Scene 1 MUST feel like a real storyteller has started telling us something that is ALREADY happening.
@@ -723,6 +729,7 @@ jobs:
                     - Final scenes: consequence + satisfying payoff directly connected to earlier events.
                     - Never repeat essentially the same action in consecutive scenes.
                     - Never use filler reaction shots with no story function.
+                    - VISUAL BEAT OWNERSHIP: Before returning each scene, silently identify WHO the viewer should be watching and WHY. The PRIMARY VISUAL SUBJECT must be the character performing or receiving the action named by the narration.
                     - Avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. in narration when possible.
                     - No semicolons, em dashes, or multiple sentence-ending marks inside a scene narration.
               """
@@ -945,6 +952,7 @@ jobs:
                   MASTER_STYLE
                   + visual_anchor
                   + CONTINUITY_RULES
+                  + " VISUAL SUBJECT RULE — the PRIMARY VISUAL SUBJECT named by the scene must be the dominant visible subject; if the narration transfers attention to another named character, visually transfer the focus to that character and do not leave the protagonist as the default focal subject. When two named characters interact, show only the characters required for that interaction and keep any crowd generic and visually distinct. Do not duplicate any named character in the same frame. "
                   + " SCENE BLUEPRINT — "
                   + scene["visual_prompt"]
                   + ", frozen cinematic moment, one dominant physical action, clear cause-and-effect staging, "
