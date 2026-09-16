@@ -584,11 +584,15 @@ jobs:
                     At least one attempt should fail or create a worse problem. The protagonist must actively influence what happens.
 
                     HOOK
-                    Scene 1 MUST begin inside an active event, not before it. Immediately show the protagonist doing something specific
-                    AND a concrete problem, danger, mystery, mistake, impossible-looking situation, unusual object, or urgent objective.
-                    The first sentence should make a viewer ask a simple question such as: What is that? Why is he running? Who is lying?
-                    What happens if she opens it? Why did that person do that?
-                    Never begin with weather, scenery, biography, waking up, walking into a room, "one day", or generic atmosphere.
+                    Scene 1 MUST feel like a real storyteller has started telling us something that is ALREADY happening.
+                    A normal activity such as walking home, carrying groceries, riding a bus, closing a shop, waiting outside, or heading to work is allowed
+                    ONLY when the sentence immediately introduces the unusual event, problem, discovery, person, object, or decision that changes the moment.
+                    Strong opening pattern: ordinary human action + specific interruption + immediate question or consequence.
+                    Example style only: "Maya was walking home when she noticed a little red suitcase moving by itself near the bus stop."
+                    Do NOT copy that example or reuse its exact structure every time. Create a fresh version appropriate to the story.
+                    The opening must sound natural when spoken aloud, as if a good human storyteller is telling a friend what happened.
+                    Avoid generic weather, scenery, biography, waking up, "one day", abstract suspense, and empty cinematic description.
+                    Do not start with a trailer voice, a quote, a moral, a question addressed directly to the viewer, or exaggerated clickbait.
 
                     PROFESSIONAL STORY LOGIC
                     - One primary protagonist with clear personality shown through behavior and decisions.
@@ -604,14 +608,28 @@ jobs:
                     - Meaning should emerge naturally from what happened; NEVER append a lecture or generic life lesson.
 
                     NATURAL STORY VOICE
-                    - Write narration as a confident human storyteller speaking naturally to a viewer, not as literary prose.
-                    - Use short-to-medium conversational sentences with natural rhythm and varied sentence openings.
-                    - Use concrete verbs and nouns, not abstract motivational language.
-                    - Avoid repetitive sentence structures such as "Then... Then... Then..."
-                    - Do not over-explain what the image already shows. Narration should add context, tension, irony, or information.
-                    - Do not sound like a news report, essay, lecture, or quote page.
-                    - The hook must be immediately understandable aloud.
-                    - Avoid forced catchphrases, fake cliffhangers, and obvious clickbait wording.
+                    - Write exactly like a skilled human storyteller casually recounting a surprising, funny, tense, or touching event to a friend.
+                    - Prefer plain spoken English over literary prose: "she was heading home when...", "then she noticed...", "he tried to... but..." when natural.
+                    - Let the voice feel warm, curious, confident, and effortless, never robotic, theatrical, or overly dramatic.
+                    - Use concrete people, objects, actions, and consequences. Name the person early so the audience can follow immediately.
+                    - Vary sentence openings and rhythm, but keep every sentence easy to understand on the first listen.
+                    - Avoid overloaded sentences with many clauses, stacked descriptions, semicolons, or strings of actions joined by commas.
+                    - One scene should usually communicate one main action or beat plus its immediate consequence.
+                    - Use small natural details that make the event feel specific, but never bury the plot under description.
+                    - Do not narrate every movement the image already shows. Add the reason, surprise, danger, joke, clue, or consequence that makes the image matter.
+                    - Do not sound like a news report, essay, lecture, children's moral lesson, trailer voice, quote page, or AI-generated summary.
+                    - Avoid forced catchphrases, fake cliffhangers, "you won't believe", "watch until the end", or obvious clickbait.
+                    - The ending should sound like a storyteller finishing an interesting incident, not a motivational speech.
+
+                    STORYTELLING QUALITY BAR
+                    - The audience should meet a person, see something happen, and immediately wonder what happens next.
+                    - Prefer specific everyday situations with an unusual turn over abstract concepts.
+                    - Start from a believable moment, then introduce one unexpected problem or discovery.
+                    - Escalate through clear cause and effect, not random events. Every new beat must grow naturally from the previous beat.
+                    - Make the protagonist solve, choose, risk, notice, misunderstand, or change something; do not let the story simply happen to them.
+                    - Use dialogue-like narration without writing fake dialogue unless dialogue is essential.
+                    - Make the twist feel earned by a clue, object, habit, decision, or detail planted earlier.
+                    - The final line should leave the viewer with a satisfying image, realization, reversal, laugh, relief, or emotional beat.
 
                     INTERNATIONAL VISUAL CLARITY
                     - A viewer should understand the main action from the image alone.
@@ -626,6 +644,9 @@ jobs:
                     The visual_identity must be concrete and stable enough for an image model to repeat.
                     Once established, NEVER change those identity traits between scenes. No random hairstyle changes, no different jacket, no different body shape,
                     no age drift, no changing colors, no disappearing accessory.
+                    Wardrobe must remain tasteful, age-appropriate, everyday, and family-friendly: no micro-shorts, underwear-like bottoms, transparent clothing,
+                    extreme cutouts, deep plunging necklines, lingerie-like outfits, or clothing designed to sexualize the character. Prefer practical casual clothes,
+                    jeans or full-length trousers, knee-length or longer skirts/dresses, hoodies, sweaters, jackets, shirts, sneakers, boots, and similar normal outfits.
                     If a supporting character returns, keep that character visually identical too and describe the returning details again inside the scene visual prompt.
 
                     MASTER VISUAL UNIVERSE
@@ -652,6 +673,7 @@ jobs:
                     Each scene must be a fresh cinematic composition, but character identity and visual universe must remain locked.
 
                     IMAGE COMPOSITION RULES
+                    - Wardrobe must stay tasteful, modest, practical, and story-appropriate in every generated frame; do not shorten skirts/shorts or alter necklines between scenes.
                     - Do not pose characters like passport photos unless the story specifically requires a portrait.
                     - Prefer active poses, clear silhouettes, readable hands, believable weight, and purposeful eye-lines.
                     - Vary camera angle and shot scale across the story while preserving the same art style.
@@ -718,7 +740,7 @@ jobs:
                     - Target about 17-21 narration words per scene when practical; hard range 12-26.
                     - Total narration 170-230 words without filler.
                     - Every narration is exactly ONE natural spoken sentence.
-                    - Scene 1: protagonist + active action + immediate problem/question/stakes.
+                    - Scene 1: naturally introduce the protagonist in the middle of an ordinary or unusual action, then immediately reveal the problem, interruption, clue, risk, or question that makes the viewer need the next scene.
                     - Scene 2: make the problem concrete.
                     - Scene 3: establish the real goal, risk, or difficult choice.
                     - Middle: attempts, complications, clues, setbacks, discoveries, reversals, or escalation.
