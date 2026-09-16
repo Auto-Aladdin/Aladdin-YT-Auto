@@ -331,6 +331,8 @@ jobs:
           groq_tokens_used_this_run = 0
           groq_tpd_safe_budget = 160000
           primary_disabled_for_run = False
+          groq_remaining_tpm = None
+          GROQ_TPM_SAFETY_MARGIN = 300
 
           def estimate_tokens(text):
               # Conservative approximation for English/JSON. We intentionally
@@ -431,7 +433,7 @@ jobs:
               response_schema,
               backup=False,
           ):
-              global last_call, groq_tokens_used_this_run, primary_disabled_for_run
+              global last_call, groq_tokens_used_this_run, primary_disabled_for_run, groq_remaining_tpm
 
               gap = time.monotonic() - last_call
               if gap < MIN_GAP:
@@ -440,14 +442,30 @@ jobs:
               estimate = estimate_tokens(prompt) + max_tokens
 
               if provider_name == "Groq":
-                  if (
-                      primary_disabled_for_run
-                      or groq_tokens_used_this_run + estimate > groq_tpd_safe_budget
-                  ):
+                  if primary_disabled_for_run:
+                      raise ProviderHTTPError(
+                          "Groq",
+                          429,
+                          "Local proactive guard: Groq disabled for this run after a daily-token exhaustion response.",
+                      )
+
+                  if groq_tokens_used_this_run + estimate > groq_tpd_safe_budget:
                       raise ProviderHTTPError(
                           "Groq",
                           429,
                           "Local proactive TPD guard: estimated request would exceed the safe Groq budget for this run.",
+                      )
+
+                  if (
+                      groq_remaining_tpm is not None
+                      and estimate + GROQ_TPM_SAFETY_MARGIN >= groq_remaining_tpm
+                  ):
+                      raise ProviderHTTPError(
+                          "Groq",
+                          429,
+                          f"Local proactive TPM guard: estimated request ({estimate}) + safety margin "
+                          f"({GROQ_TPM_SAFETY_MARGIN}) is too close to the latest Groq TPM remaining "
+                          f"({groq_remaining_tpm}).",
                       )
 
               payload = make_payload(
@@ -498,6 +516,10 @@ jobs:
                       )
                       remaining_tpm = headers.get("x-ratelimit-remaining-tokens")
                       if remaining_tpm:
+                          try:
+                              groq_remaining_tpm = int(remaining_tpm)
+                          except (TypeError, ValueError):
+                              groq_remaining_tpm = None
                           print(
                               f"[Groq] {label} TPM remaining: {remaining_tpm}",
                               flush=True,
@@ -552,6 +574,12 @@ jobs:
                               groq_tokens_used_this_run += (
                                   actual_tokens if actual_tokens > 0 else estimate
                               )
+                              retry_remaining_tpm = retry_headers.get("x-ratelimit-remaining-tokens")
+                              if retry_remaining_tpm:
+                                  try:
+                                      groq_remaining_tpm = int(retry_remaining_tpm)
+                                  except (TypeError, ValueError):
+                                      groq_remaining_tpm = None
 
                           print(
                               f"[{provider_name}] {label} retry success in {retry_elapsed:.2f}s "
@@ -607,8 +635,9 @@ jobs:
                           + str(primary_exc)
                       ) from primary_exc
 
+                  reason = "proactive quota guard" if "proactive" in primary_exc.raw.lower() else "Groq daily token limit"
                   print(
-                      f"[Fallback] Groq unavailable for {label}; switching to "
+                      f"[Fallback] Groq unavailable for {label} ({reason}); switching to "
                       f"LLM7.io {BACKUP_MODEL}.",
                       flush=True,
                   )
@@ -720,8 +749,8 @@ jobs:
                   return "Protagonist age must be 21-70."
 
               role = str(protagonist.get("role", "")).strip()
-              if len(role.split()) < 2:
-                  return "Protagonist role needs at least 2 words."
+              if not role:
+                  return "Missing protagonist role."
 
               scenes = story["scenes"]
               if not isinstance(scenes, list):
@@ -923,7 +952,7 @@ jobs:
                       "protagonist": {{
                         "name": "specific adult name",
                         "age": 21-35,
-                        "role": "specific role with at least two words",
+                        "role": "specific adult occupation or role; one or more words is valid",
                         "visual_identity": "exact face shape, eye shape/color, eyebrow shape, hairstyle/color, skin tone, body build, outfit colors, footwear, distinctive accessory"
                       }},
                       "setting": "specific physical setting",
