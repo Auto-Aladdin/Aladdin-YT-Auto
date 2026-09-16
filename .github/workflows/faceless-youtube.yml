@@ -45,7 +45,7 @@ jobs:
           # MISSION
           # ============================================================
           # One daily faceless motivational/emotional Short:
-          # story -> scene image -> free TTS -> captions -> motion video
+          # story -> scene image -> free TTS -> motion video
           #
           # Designed for GitHub Actions so the user's computer does not
           # need to stay online.
@@ -59,6 +59,7 @@ jobs:
           ASSETS = OUT / "assets"
           IMAGES = ASSETS / "images"
           SCENES = ASSETS / "clips"
+          TIMING_SRT = Path("/tmp/tts_scene_timing.srt")
 
           HISTORY_FILE = ROOT / ".github" / "data" / "story_history.json"
 
@@ -106,6 +107,13 @@ jobs:
               "a competitive challenge where the obvious winning strategy is the trap",
               "an everyday rule that creates an unusual but logical consequence",
               "a near-mistake that reveals what was actually happening",
+              "a promise made carelessly that becomes surprisingly costly to keep",
+              "a shortcut that works fine until it quietly creates a bigger problem",
+              "two strangers who need the same scarce thing at the same moment",
+              "a well-meant warning that turns out to rest on a wrong assumption",
+              "a skill nobody respected turning out to be exactly what the moment needs",
+              "a favor returned in a way nobody expected",
+              "a small lie that has to be maintained through an inconvenient test",
           ]
 
           SETTINGS = [
@@ -129,6 +137,13 @@ jobs:
               "small bicycle repair shop",
               "city bus depot",
               "apartment rooftop laundry area",
+              "late-night laundromat",
+              "downtown parking garage",
+              "community garden plot",
+              "small print shop",
+              "corner hardware store",
+              "neighborhood barbershop",
+              "shared co-working space",
           ]
 
           EMOTIONS = [
@@ -147,6 +162,11 @@ jobs:
               "embarrassment turning into relief",
               "gentle irony",
               "high-stakes focus without melodrama",
+              "restrained anger giving way to clarity",
+              "nervous excitement",
+              "bittersweet acceptance",
+              "stubborn pride softening",
+              "quiet vindication",
           ]
 
           HOOK_MODES = [
@@ -159,6 +179,8 @@ jobs:
               "begin with a character noticing that something is out of place in an ordinary environment",
               "open with a simple task that becomes unexpectedly difficult for a concrete reason",
               "start with a confident choice that immediately creates a new problem",
+              "open mid-conversation so the audience catches up through context, not exposition",
+              "begin with a character breaking their own rule for a specific, understandable reason",
           ]
 
           TWIST_MODES = [
@@ -172,6 +194,8 @@ jobs:
               "an earlier small choice changes the meaning of the final scene",
               "the opening detail returns in a new context and explains what really happened",
               "the apparent loss turns out to have prevented a larger problem",
+              "the character's greatest strength is also the source of the problem",
+              "what looked like an obstacle was actually a test set up by someone else",
           ]
 
           ENDING_MODES = [
@@ -184,6 +208,8 @@ jobs:
               "a small victory that reveals what the character actually valued",
               "a satisfying reversal where the audience realizes the clue was visible all along",
               "an understated final beat that lets the situation speak for itself",
+              "a bittersweet trade-off that still feels like the right call",
+              "a wry final beat delivered through action rather than a spoken line",
           ]
 
           BANNED = [
@@ -258,9 +284,19 @@ jobs:
                   return []
 
           history = load_history()
-          recent = history[-20:]
+          # 15 recent entries is enough for the model to spot a repeated premise;
+          # the full hook sentence isn't needed for that, just its gist, so it's
+          # trimmed to keep this recurring block of the prompt lean.
+          recent = history[-15:]
+
+          def _gist(text, max_words=10):
+              words_list = str(text).split()
+              if len(words_list) <= max_words:
+                  return str(text).strip()
+              return " ".join(words_list[:max_words]) + "…"
+
           recent_text = "\n".join(
-              f"- {x.get('title','')} | {x.get('premise','')} | {x.get('setting','')}"
+              f"- {x.get('title','')} | {_gist(x.get('premise',''))} | {x.get('setting','')}"
               for x in recent
           ) or "NONE"
 
@@ -572,6 +608,23 @@ jobs:
               return None
 
           def create_story():
+              # Named once so the same emotional flavor can also steer the
+              # narrator's delivery (pacing/pitch) later, without a second
+              # random draw or any extra Groq call.
+              chosen_domain = random.choice(DOMAINS)
+              chosen_setting = random.choice(SETTINGS)
+              chosen_emotion = random.choice(EMOTIONS)
+              chosen_hook_mode = random.choice(HOOK_MODES)
+              chosen_twist_mode = random.choice(TWIST_MODES)
+              chosen_ending_mode = random.choice(ENDING_MODES)
+
+              def finalize(s):
+                  # Tag the finished story with the emotional flavor it was
+                  # written around, so the TTS step can match delivery
+                  # (pacing/pitch) to the story's actual tone.
+                  s["_narration_style"] = chosen_emotion
+                  return s
+
               prompt = f"""
                     ROLE
                     You are the showrunner, head writer, storyboard director, and visual-continuity supervisor
@@ -629,6 +682,8 @@ jobs:
                     on first listen. Use concrete names/actions early, with varied short-to-medium rhythm.
                     Each scene narration is ONE sentence. Narrate what the storyteller adds beyond the image:
                     reason, surprise, clue, consequence, or emotional meaning. Do not narrate every visible movement.
+                    Favor one specific noun, number, or named object over a vague generality wherever it fits naturally
+                    ("the third booth by the window" beats "a nearby table"); specificity is what makes a story feel real.
                     Avoid stiff/essay language, generic inspiration, fake suspense, "you won't believe", "watch until the end",
                     "life lesson", "moral of the story", and repetitive catchphrases.
 
@@ -696,17 +751,6 @@ jobs:
                     magic, miracles, or traumatic shock bait. Non-graphic tension, danger, crime-like situations,
                     weapons, or chase elements may exist when story-relevant, but never provide instructions for wrongdoing/harm.
 
-                    DIVERSIFIERS — INGREDIENTS, NOT TEMPLATES
-                    Domain: {random.choice(DOMAINS)}
-                    Setting: {random.choice(SETTINGS)}
-                    Emotional flavor: {random.choice(EMOTIONS)}
-                    Hook mode: {random.choice(HOOK_MODES)}
-                    Twist mode: {random.choice(TWIST_MODES)}
-                    Ending mode: {random.choice(ENDING_MODES)}
-
-                    RECENT HISTORY
-                    {recent_text}
-
                     FINAL CHECK BEFORE JSON
                     Verify: specific/original premise; active protagonist; visible goal + obstacle; meaningful progression;
                     real setback/reversal; earned payoff; natural opening; distinct/locked characters; distinct visual beats;
@@ -748,6 +792,17 @@ jobs:
                     - Establish important new characters visually when they matter; transfer camera focus when attention transfers.
                     - Background crowds never duplicate named characters.
                     - Avoid Mr./Mrs./Ms./Dr./St. in narration when possible; no semicolons, em dashes, or multiple sentence-ending marks.
+
+                    DIVERSIFIERS — INGREDIENTS, NOT TEMPLATES, FOR THIS EPISODE ONLY
+                    Domain: {chosen_domain}
+                    Setting: {chosen_setting}
+                    Emotional flavor: {chosen_emotion}
+                    Hook mode: {chosen_hook_mode}
+                    Twist mode: {chosen_twist_mode}
+                    Ending mode: {chosen_ending_mode}
+
+                    RECENT HISTORY — DO NOT REPEAT THESE PREMISES/STRUCTURES
+                    {recent_text}
               """
 
 
@@ -763,7 +818,7 @@ jobs:
                   normalize_story_narrations(story)
                   issue = validate_story(story)
                   if not issue:
-                      return story
+                      return finalize(story)
 
                   print(f"[validator] {issue}", flush=True)
 
@@ -821,7 +876,7 @@ jobs:
                                       f"[validator] fixed {shortfall}-word shortfall locally; no repair call used.",
                                       flush=True,
                                   )
-                                  return story
+                                  return finalize(story)
 
                   repair_prompt = f"""
                     Perform a MINIMAL repair of the SAME story.
@@ -855,7 +910,7 @@ jobs:
                   normalize_story_narrations(story)
                   issue = validate_story(story)
                   if not issue:
-                      return story
+                      return finalize(story)
 
                   print(f"[repair-validator] {issue}", flush=True)
 
@@ -890,8 +945,42 @@ jobs:
           # ============================================================
           # FREE TTS: edge-tts
           # ============================================================
+          # One consistent narrator voice keeps the channel's identity
+          # recognizable across episodes (per the brief: consistent identity
+          # is fine, identical *content* is not). What changes per-episode is
+          # delivery: rate and pitch are tuned to the story's own emotional
+          # flavor so a tense story is told differently than a warm or funny
+          # one, without a second voice model or any extra API call.
 
           voice = "en-US-ChristopherNeural"
+
+          NARRATION_DELIVERY = {
+              "curiosity with quiet tension": ("+0%", "+0Hz"),
+              "playful awkwardness": ("+4%", "+15Hz"),
+              "contained suspense": ("-6%", "-15Hz"),
+              "warm relief": ("-2%", "+0Hz"),
+              "surprise": ("+6%", "+20Hz"),
+              "earned determination": ("+2%", "-5Hz"),
+              "wonder": ("-4%", "+10Hz"),
+              "pressure and uncertainty": ("-4%", "-10Hz"),
+              "dry humor": ("+0%", "-5Hz"),
+              "earned trust": ("-2%", "+0Hz"),
+              "quiet emotional impact": ("-8%", "-5Hz"),
+              "clever triumph": ("+4%", "+10Hz"),
+              "embarrassment turning into relief": ("+0%", "+5Hz"),
+              "gentle irony": ("+0%", "-5Hz"),
+              "high-stakes focus without melodrama": ("+2%", "-5Hz"),
+              "restrained anger giving way to clarity": ("-2%", "-10Hz"),
+              "nervous excitement": ("+6%", "+15Hz"),
+              "bittersweet acceptance": ("-6%", "-5Hz"),
+              "stubborn pride softening": ("-2%", "-5Hz"),
+              "quiet vindication": ("-4%", "+0Hz"),
+          }
+          DEFAULT_DELIVERY = ("+0%", "+0Hz")
+
+          narration_rate, narration_pitch = NARRATION_DELIVERY.get(
+              story.get("_narration_style", ""), DEFAULT_DELIVERY
+          )
 
           run_cmd([
               sys.executable,
@@ -900,13 +989,19 @@ jobs:
               "--voice",
               voice,
               "--rate",
-              "+0%",
+              narration_rate,
+              "--pitch",
+              narration_pitch,
               "--text",
               script,
               "--write-media",
               str(OUT / "voice.mp3"),
               "--write-subtitles",
-              str(OUT / "captions.srt"),
+              # This subtitle file is used only internally to detect each
+              # sentence's start time so scene images stay in sync with the
+              # narration; it is written outside short-output/ so no caption
+              # file is produced in the final deliverable.
+              str(TIMING_SRT),
           ], timeout=180)
 
           # ============================================================
@@ -1008,7 +1103,9 @@ jobs:
                   "cinematic palette; coherent warm/cool color harmony; nuanced skin and fabric rendering; "
                   "believable environments; accurate perspective; strong foreground/midground/background depth; "
                   "atmospheric light; realistic cast and contact shadows; polished storytelling detail; "
-                  "premium animated-film composition with a handcrafted illustrated feel. "
+                  "premium animated-film composition with a handcrafted illustrated feel; subtle filmic color grading; "
+                  "gentle lens depth-of-field falloff on background elements; soft rim light separating subject from "
+                  "background; light painterly grain texture, never digital noise or artifact-like grain. "
                   "Every frame must look like it was made by the same artist, with the same character design language, "
                   "linework, proportions, brush texture, shading behavior, color grading, and visual imagination. "
                   "No photorealism, live action, 3D CGI, anime, manga, chibi, flat vector, generic AI cartoon, "
@@ -1022,7 +1119,8 @@ jobs:
                   "If the scene blueprint gives a supporting character identity, render that character as a distinct, "
                   "consistent person and do not substitute the protagonist. "
                   "Preserve spatial relationships that matter to the action and keep props physically consistent "
-                  "between adjacent scenes. "
+                  "between adjacent scenes. Keep the overall color grade and lighting language of this film consistent "
+                  "scene to scene, adjusting only the specific light source called for by this scene's mood/time/weather. "
                   "Use the visual_differentiation field to change framing, action, composition, subject focus, "
                   "or object state rather than changing character design. "
               )
@@ -1085,7 +1183,7 @@ jobs:
               ss, ms = rest.split(",", 1)
               return int(hh) * 3600 + int(mm) * 60 + int(ss) + int(ms) / 1000.0
 
-          raw_srt = (OUT / "captions.srt").read_text(encoding="utf-8")
+          raw_srt = TIMING_SRT.read_text(encoding="utf-8")
           blocks = re.split(r"\n\s*\n", raw_srt.strip()) if raw_srt.strip() else []
           caption_items = []
           for block in blocks:
@@ -1110,78 +1208,6 @@ jobs:
           for i, start in enumerate(scene_starts):
               next_start = scene_starts[i + 1] if i + 1 < len(scene_starts) else audio_duration
               durations.append(max(0.05, next_start - start))
-
-          # Normalize and rewrite the captions so the final video has exactly
-          # one non-overlapping subtitle cue per scene.
-          normalized_blocks = []
-
-          def srt_time(seconds):
-              millis = max(0, int(round(seconds * 1000)))
-              hh = millis // 3600000
-              millis %= 3600000
-              mm = millis // 60000
-              millis %= 60000
-              ss = millis // 1000
-              ms = millis % 1000
-              return f"{hh:02d}:{mm:02d}:{ss:02d},{ms:03d}"
-
-          running = 0.0
-          for i, (_, _, text) in enumerate(caption_items):
-              start = running
-              end = running + durations[i]
-              running = end
-              normalized_blocks.append(
-                  f"{i + 1}\n{srt_time(start)} --> {srt_time(end)}\n{text}"
-              )
-
-          (OUT / "captions.srt").write_text(
-              "\n\n".join(normalized_blocks) + "\n",
-              encoding="utf-8",
-          )
-
-          # Build a dedicated ASS track so subtitle size and vertical position
-          # are deterministic on the 1080x1920 Shorts canvas.
-          def ass_time(seconds):
-              total_cs = max(0, int(round(seconds * 100)))
-              hh = total_cs // 360000
-              total_cs %= 360000
-              mm = total_cs // 6000
-              total_cs %= 6000
-              ss = total_cs // 100
-              cs = total_cs % 100
-              return f"{hh}:{mm:02d}:{ss:02d}.{cs:02d}"
-
-          def ass_escape(text):
-              return str(text).replace("\\", "\\\\").replace("{", "\\{").replace("}", "\\}").replace("\n", " ")
-
-          ass_lines = [
-              "[Script Info]",
-              "ScriptType: v4.00+",
-              "PlayResX: 1080",
-              "PlayResY: 1920",
-              "ScaledBorderAndShadow: yes",
-              "WrapStyle: 0",
-              "YCbCr Matrix: TV.709",
-              "",
-              "[V4+ Styles]",
-              "Format: Name, Fontname, Fontsize, PrimaryColour, SecondaryColour, OutlineColour, BackColour, Bold, Italic, Underline, StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, Alignment, MarginL, MarginR, MarginV, Encoding",
-              "Style: Shorts,DejaVu Sans,32,&H00FFFFFF,&H00FFFFFF,&H90000000,&H70000000,0,0,0,0,100,100,0,0,3,2,0,2,80,80,210,1",
-              "",
-              "[Events]",
-              "Format: Layer, Start, End, Style, Name, MarginL, MarginR, MarginV, Effect, Text",
-          ]
-
-          for i, (_, _, text) in enumerate(caption_items):
-              start = 0.0 if i == 0 else sum(durations[:i])
-              end = start + durations[i]
-              ass_lines.append(
-                  f"Dialogue: 0,{ass_time(start)},{ass_time(end)},Shorts,,0,0,0,,{ass_escape(text)}"
-              )
-
-          (OUT / "captions.ass").write_text(
-              "\n".join(ass_lines) + "\n",
-              encoding="utf-8",
-          )
 
           for i, (scene, duration) in enumerate(
               zip(story["scenes"], durations),
@@ -1295,7 +1321,7 @@ jobs:
           print("Title:", story["title"], flush=True)
           print("Scenes:", len(story["scenes"]), flush=True)
           print("Words:", words(script), flush=True)
-          print("Voice:", voice, flush=True)
+          print("Voice:", voice, f"(rate {narration_rate}, pitch {narration_pitch})", flush=True)
           print("Video:", final_video, flush=True)
           PY
 
