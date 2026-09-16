@@ -1173,10 +1173,14 @@ jobs:
                   f"{story['title']}|scene-{index}|"
                   f"{scene['narration']}|{scene['visual_prompt']}"
               )
+              # Pollinations requires seed <= 2147483647 (signed 32-bit max).
+              # Keep deterministic per-scene variation while guaranteeing a valid API value.
               seed = int(
                   hashlib.sha256(seed_material.encode("utf-8")).hexdigest()[:8],
                   16,
-              )
+              ) % 2147483647
+              if seed <= 0:
+                  seed = 1
 
               prompt = (
                   MASTER_STYLE
