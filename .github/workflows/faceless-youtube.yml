@@ -681,8 +681,26 @@ jobs:
 
               SCENES: Every scene is a different cinematic frame with one dominant physical action or visible change. Vary shot size, angle, composition, interaction, prop state, and location zone. Keep vertical 9:16 framing, readable poses, believable hands, grounded bodies, meaningful props, and clear foreground/midground/background depth. When narration names a supporting character's action, show that character prominently.
 
-              VISUAL_PROMPT: For every scene use these labels in order, keeping each field concise but concrete:
-              SCENE | PRIMARY VISUAL SUBJECT | ON-SCREEN CHARACTERS | CHARACTER | ACTION | LOCATION | MOOD | CAMERA | LIGHTING | CONTINUITY | VISUAL DIFFERENTIATION
+              VISUAL_PROMPT: Write one compact, production-ready cinematic image prompt for each scene.
+
+              Every visual_prompt MUST naturally include:
+              - primary visual subject
+              - all important on-screen characters
+              - character identity/appearance when relevant
+              - one clear physical action or visible change
+              - location and environment
+              - mood/emotion
+              - camera shot/angle/composition
+              - lighting
+              - continuity with established characters, wardrobe, props, and setting
+              - a distinct visual beat that differs from nearby scenes
+
+              Do NOT use field labels, headings, bullet points, or repeated boilerplate.
+              Do NOT restate the global art style in every scene.
+              Do NOT repeat character descriptions unless needed for continuity or a meaningful visual change.
+              Use concrete visual nouns and verbs instead of long adjective chains.
+              Keep each visual_prompt approximately 28–42 words.
+              Prioritize what the image generator must visibly depict over explanation.
               IMPORTANT: In each scene object, the `scene` field MUST be a JSON integer (1, 2, 3...), never a quoted string.
 
               Use these creative starting points, not templates:
@@ -702,7 +720,7 @@ jobs:
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
                       prompt,
-                      max_tokens=2300,
+                      max_tokens=3000,
                       temperature=0.65,
                       label=f"story-{call_number}",
                       response_schema=STORY_SCHEMA,
