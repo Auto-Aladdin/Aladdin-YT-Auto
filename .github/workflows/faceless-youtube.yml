@@ -319,7 +319,7 @@ jobs:
 
           groq_tokens_used_this_run = 0
           groq_usage_today = load_groq_usage()
-          groq_tpd_safe_budget = 160000
+          groq_tpd_safe_budget = 160000  # Conservative ceiling below Groq's 200K TPD limit
           primary_disabled_for_run = False
           groq_remaining_tpm = None
           GROQ_TPM_SAFETY_MARGIN = 300
@@ -1446,16 +1446,21 @@ jobs:
           print("Video:", final_video, flush=True)
           PY
 
-      - name: Commit history
+      - name: Persist history and Groq quota ledger
+        if: ${{ always() }}
         run: |
           set -euo pipefail
           git config user.name "github-actions[bot]"
           git config user.email "41898282+github-actions[bot]@users.noreply.github.com"
-          git add .github/data/story_history.json .github/data/groq_usage.json
+
+          # Persist the quota ledger even when production fails so later runs
+          # cannot forget tokens already consumed earlier in the same UTC day.
+          git add .github/data/story_history.json .github/data/groq_usage.json 2>/dev/null || true
+
           if git diff --cached --quiet; then
-            echo "No history changes to commit."
+            echo "No history or quota-ledger changes to commit."
           else
-            git commit -m "Generate daily faceless short history"
+            git commit -m "Persist Shorts history and Groq quota ledger"
             git push
           fi
 
