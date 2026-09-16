@@ -621,16 +621,6 @@ jobs:
                     - Avoid forced catchphrases, fake cliffhangers, "you won't believe", "watch until the end", or obvious clickbait.
                     - The ending should sound like a storyteller finishing an interesting incident, not a motivational speech.
 
-                    STORYTELLING QUALITY BAR
-                    - The audience should meet a person, see something happen, and immediately wonder what happens next.
-                    - Prefer specific everyday situations with an unusual turn over abstract concepts.
-                    - Start from a believable moment, then introduce one unexpected problem or discovery.
-                    - Escalate through clear cause and effect, not random events. Every new beat must grow naturally from the previous beat.
-                    - Make the protagonist solve, choose, risk, notice, misunderstand, or change something; do not let the story simply happen to them.
-                    - Use dialogue-like narration without writing fake dialogue unless dialogue is essential.
-                    - Make the twist feel earned by a clue, object, habit, decision, or detail planted earlier.
-                    - The final line should leave the viewer with a satisfying image, realization, reversal, laugh, relief, or emotional beat.
-
                     INTERNATIONAL VISUAL CLARITY
                     - A viewer should understand the main action from the image alone.
                     - Every scene must contain ONE dominant visual action and a clear reason it matters.
@@ -657,8 +647,7 @@ jobs:
                     painterly digital coloring; subtle cel shading; soft tonal gradients; gentle textured brushwork; rich but slightly muted cinematic colors;
                     natural warm/cool color harmony; detailed believable environments; accurate perspective; strong foreground/midground/background depth;
                     atmospheric lighting; realistic cast and contact shadows; cinematic composition; polished storytelling detail; charming, slightly gritty, premium entertainment look.
-                    The style MUST NOT drift into photorealism, 3D CGI, anime, manga, chibi, flat vector art, preschool art, generic AI cartoon art, or children's book clip-art.
-                    Preserve the same linework, proportions, rendering, palette behavior, shading language, facial design quality, and visual sophistication across every scene.
+                    Never drift into photorealism, 3D CGI, anime, manga, chibi, flat vector, preschool art, generic AI cartoon art, or clip-art. Preserve the same linework, proportions, palette, shading, facial design, and rendering quality across scenes.
 
                     SCENE-TO-IMAGE CONTRACT
                     For every scene, create the visual_prompt using these exact labeled fields in this order:
@@ -697,21 +686,8 @@ jobs:
                     RECENT HISTORY
                     {recent_text}
 
-                    FINAL PROFESSIONAL SELF-CHECK
-                    Before returning JSON, silently verify all of these:
-                    1. Could this opening stop a viewer from swiping?
-                    2. Is the protagonist actively doing something immediately?
-                    3. Is the problem/goal understandable on first listen?
-                    4. Does every scene change the situation?
-                    5. Is there at least one believable failed attempt or reversal?
-                    6. Does the protagonist make a meaningful choice?
-                    7. Does the ending pay off something established earlier?
-                    8. Is this materially different from recent history?
-                    9. Can every scene be drawn as one strong image?
-                    10. Are the protagonist's visual identity details identical throughout?
-                    11. Does the narration sound like a natural storyteller rather than a writer showing off?
-                    12. Does the visual style exactly match the MASTER VISUAL UNIVERSE?
-                    Delete filler, repetition, generic moralizing, and weak scenes before returning JSON.
+                    FINAL SELF-CHECK
+                    Before returning JSON, silently verify: strong immediate hook; active protagonist; clear goal/problem; every scene changes the situation; at least one setback/reversal; earned payoff; material difference from recent history; consistent character/art style; natural storyteller voice; every scene visually filmable. Delete filler and repetition.
 
                     OUTPUT CONTRACT
                     Return ONLY this top-level JSON object and nothing else:
@@ -736,8 +712,8 @@ jobs:
                     }}
 
                     SCENE CONTRACT
-                    - Use 7-16 scenes based on natural pacing, never padding to hit a number.
-                    - Target about 17-21 narration words per scene when practical; hard range 12-26.
+                    - Plan 8-10 scenes when practical; never fewer than 7 or more than 16, and never pad with filler.
+                    - Target 17-21 narration words per scene; hard range 12-26. Count every scene before returning.
                     - Total narration 170-230 words without filler.
                     - Every narration is exactly ONE natural spoken sentence.
                     - Scene 1: naturally introduce the protagonist in the middle of an ordinary or unusual action, then immediately reveal the problem, interruption, clue, risk, or question that makes the viewer need the next scene.
@@ -768,46 +744,27 @@ jobs:
                   print(f"[validator] {issue}", flush=True)
 
                   repair_prompt = f"""
-                    Repair this story so it passes ALL deterministic requirements.
+                    Repair the SAME story so it passes deterministic validation; do not replace the premise with a generic story.
 
-                    CURRENT PROBLEM:
-                    {issue}
+                    CURRENT PROBLEM: {issue}
 
-                    IMPORTANT:
-                    Do not only fix the named problem.
-                    Re-check EVERY requirement before returning.
-                    Keep the same core premise and characters.
-                    Do not replace the story with a different generic story.
+                    Keep the same protagonist, relationship, setting, tone, hook, and visual identity unless a minimal correction is necessary. Return the COMPLETE JSON object.
 
-                    Hard requirements:
-                    - top-level JSON OBJECT only
-                    - title
-                    - hook
-                    - description
-                    - protagonist object with fields: name, age, role, visual_identity
-                    - setting
-                    - between 7 and 16 scenes, choosing the count that fits the story
-                    - each scene has scene, narration, visual_prompt
-                    - narration lengths should be natural for the chosen scene count; target roughly 17-21 words when practical, with hard allowance 14-26 per scene
-                    - total narration should target 180-210 words; hard allowance 170-230, with natural variation in scene lengths when the chosen scene count requires it
-                    - scene count must remain within 7-16 and should match the natural pacing of the story
-                    - never add filler scenes solely to reach a target count
-                    - each narration must be exactly ONE simple sentence
-                    - avoid abbreviations such as Mr., Mrs., Ms., Dr., St., etc. inside narration when possible
-                    - no semicolons, em dashes, multiple sentences, literary wording, or vague metaphors
-                    - use simple everyday English and concrete visible actions
-                    - protagonist role is at least 2 words
-                    - hook is 10-24 words
-                    - description is 20-90 words
-                    - all scenes are faceless-filmable
-                    - preserve the story's natural scene count; do not add filler scenes or delete meaningful scenes just to hit a number
-                    - no banned patterns
+                    HARD CHECKS:
+                    - 7-16 scenes; prefer 8-10; never add filler.
+                    - Every scene has scene, narration, visual_prompt.
+                    - Narration: exactly ONE natural spoken sentence, 12-26 words, target 17-21.
+                    - Total narration: 170-230 words, target 180-210.
+                    - Simple spoken English; concrete actions; no semicolons, em dashes, multiple sentences, literary wording, or vague metaphors.
+                    - Preserve causal flow, strongest hook, character continuity, modest family-friendly wardrobe, and original visual style.
+                    - No banned patterns.
+                    - Before returning JSON, silently re-check scene count, every scene word count, total word count, sentence count, required fields, and valid JSON.
 
                     STORY:
                     {json.dumps(story, ensure_ascii=False)}
 
                     Return ONLY the corrected JSON object.
-                    """
+                  """
 
                   story = groq_json(
                       repair_prompt,
