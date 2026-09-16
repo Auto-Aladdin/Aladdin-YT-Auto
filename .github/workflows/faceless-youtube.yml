@@ -90,22 +90,24 @@ jobs:
           # ------------------------------------------------------------
 
           DOMAINS = [
-              "mystery in an ordinary place",
-              "clever escape from an unexpected problem",
-              "awkward social misunderstanding",
-              "rivalry with a surprising reversal",
-              "strange object that creates a real-world problem",
-              "impossible-looking task solved through observation",
-              "friendship tested by a risky choice",
-              "family secret revealed through an everyday object",
-              "small mistake that spirals into chaos",
-              "unexpected rescue with a clever payoff",
-              "competitive challenge with a hidden rule",
-              "ordinary job interrupted by something bizarre",
-              "lost item mystery with a human payoff",
-              "chase caused by a misunderstanding",
-              "unexpected act of courage without a speech",
-              "funny chain reaction with emotional payoff",
+              "ordinary job interrupted by a bizarre but believable mistake",
+              "two strangers accidentally swap something important and each thinks the other stole it",
+              "a harmless-looking object creates a problem nobody understands at first",
+              "a friendly rivalry becomes complicated when an overlooked rule changes everything",
+              "a character notices one tiny detail that proves the obvious explanation is wrong",
+              "a simple favor turns into a chain reaction of increasingly awkward consequences",
+              "a character tries to hide a small mistake before someone notices, making it much worse",
+              "two people unknowingly work toward opposite goals using the same object",
+              "a routine delivery arrives at the wrong place and triggers a clever mystery",
+              "a character makes one confident assumption and must reverse it after a surprising clue",
+              "a competitive challenge looks easy until an unexpected constraint appears",
+              "a normal repair, purchase, or appointment reveals a problem hidden in plain sight",
+              "a character follows a strange instruction and discovers its real purpose later",
+              "a misunderstanding sends a character in the wrong direction while the real clue stays nearby",
+              "a small act of cleverness solves a problem that initially looks much bigger",
+              "a funny coincidence appears impossible until an earlier detail explains it",
+              "a familiar place behaves strangely because someone quietly changed one important thing",
+              "a character tries to prove they are right and accidentally uncovers a different truth",
           ]
 
           SETTINGS = [
@@ -664,9 +666,10 @@ jobs:
                     mini-film that is entertaining even when understood visually without perfect language comprehension.
 
                     CORE MISSION
-                    Make the viewer think immediately: "WAIT — WHAT IS HAPPENING?"
-                    Then make every next scene answer one question while creating another. The story must feel
-                    intentionally written by a professional human entertainment team, never like an interchangeable AI template.
+                    Make the viewer think immediately: "WAIT — WHAT?"
+                    Then create a clean chain of curiosity: each beat answers something while opening a more interesting question.
+                    The finished Short should feel like a tiny scene from a smart animated film that happens to be told in under a minute,
+                    not like a generic AI story, a moral lesson, or a sequence of events.
 
                     ORIGINALITY IS NON-NEGOTIABLE
                     - The story must be materially different from recent uploads. Changing names, clothing, or location alone is NOT variation.
@@ -676,11 +679,19 @@ jobs:
                     - Never repeat the same moral formula, rescue formula, misunderstanding formula, chase formula, reveal formula, or emotional ending back-to-back.
                     - Do not make every protagonist a helpless victim who is rewarded for being kind.
                     - Do not make every story about money, helping strangers, lost valuables, apologies, or workplace lessons.
+                    - Avoid generic "mysterious note -> follow clue -> rescue someone -> grateful stranger" structures.
+                    - Avoid fake twists where the final reveal changes nothing important. The reveal must reframe earlier information or explain a clue.
+                    - Prefer a specific problem with a surprising mechanism over vague danger or vague mystery.
 
                     RETENTION ENGINE
                     Design a causal chain with escalating consequences:
                     HOOK -> QUESTION -> GOAL -> FIRST MOVE -> COMPLICATION -> ESCALATION -> CHOICE -> CONSEQUENCE ->
                     REVEAL/REVERSAL -> PAYOFF.
+                    The hook is NOT a synopsis. It is the first interesting moment of the story: a normal human situation is interrupted
+                    by one concrete thing that does not make sense yet. The audience should immediately understand WHO is involved,
+                    WHAT they were doing, and WHAT suddenly went wrong or became strange.
+                    Every 1-2 scenes must add a new piece of information, change the plan, raise the stakes, create a funny complication,
+                    reveal a clue, or force a decision. If a scene merely moves a character from A to B, rewrite it.
                     The structure may bend when a stronger story needs it, but nothing may feel like filler.
                     Every 1-2 scenes must introduce a meaningful change in information, risk, plan, location, relationship, object, or consequence.
                     At least one attempt should fail or create a worse problem. The protagonist must actively influence what happens.
@@ -692,14 +703,19 @@ jobs:
                     - Crowd/background characters must remain generic and must never duplicate the protagonist or any named supporting character.
 
                     HOOK + STORYTELLER OPENING
-                    Scene 1 must sound like the FIRST SENTENCE OF A REAL PERSON TELLING AN INTERESTING STORY, not like an image prompt, trailer, synopsis, or puzzle.
+                    Scene 1 must sound like the FIRST SENTENCE OF A PROFESSIONAL STORYTELLER telling a surprising true-to-life anecdote,
+                    not like an image prompt, trailer, synopsis, puzzle, or AI-generated summary.
+                    The opening should have a tiny human detail that makes the protagonist feel real, followed immediately by a specific disruption.
                     The audience should meet the protagonist naturally before the unusual event becomes clear. Use a warm, conversational setup when it fits: introduce the person, what they normally enjoy/do, and then let one specific event interrupt that ordinary moment.
                     A natural pattern such as "There was a boy named Noah who loved basketball, and one afternoon everything changed when..." is a REFERENCE STYLE only, never a fixed template. Do not repeat that wording or force the same opening structure every time.
                     Other valid openings can begin with a girl walking home, a man closing his shop, a student heading to practice, a mechanic finishing a job, two friends joking around, or another believable everyday moment.
                     The key is: PERSON + ORDINARY CONTEXT/PERSONAL DETAIL + SPECIFIC TURNING EVENT + IMMEDIATE CURIOSITY.
                     Do not jump straight into an unexplained shadow, object, chase, accusation, or abstract mystery unless the audience first understands who is involved and what they were doing.
-                    The first sentence must still create a reason to keep listening, but the curiosity should come from a clear human situation, not forced clickbait.
-                    Avoid generic weather/scenery openings, biography dumps, waking-up clichés, empty suspense, trailer voice, quotes, morals, viewer-directed questions, and repeated "one day" formulas.
+                    The first sentence must create a concrete unanswered question without explaining the whole plot.
+                    Good curiosity comes from a contradiction, odd behavior, unexpected consequence, unusual object, social misunderstanding, or problem with a clear human reason to care.
+                    Keep the language simple enough for an international viewer to understand on first hearing.
+                    Avoid generic weather/scenery openings, biography dumps, waking-up clichés, empty suspense, trailer voice, quotes, morals, viewer-directed questions,
+                    repeated "one day" formulas, and openings that begin with "I was" unless first-person narration is genuinely essential.
 
                     PROFESSIONAL STORY LOGIC
                     - One primary protagonist with clear personality shown through behavior and decisions.
@@ -715,7 +731,11 @@ jobs:
                     - Meaning should emerge naturally from what happened; NEVER append a lecture or generic life lesson.
 
                     NATURAL STORY VOICE
-                    - Write exactly like a skilled human storyteller casually recounting a surprising, funny, tense, or touching event to a friend.
+                    - Write like a polished professional storyteller: warm, confident, conversational, vivid, and easy to follow aloud.
+                    - Use short spoken sentences and natural rhythm, with occasional punchy fragments only when grammatically natural.
+                    - Build anticipation through wording and information order, not exaggerated adjectives.
+                    - Let the narrator sound amused, intrigued, tense, or relieved when the scene calls for it, without acting every line theatrically.
+                    - Write exactly like a skilled human storyteller recounting a surprising, funny, tense, or touching event to a friend.
                     - Prefer plain spoken English over literary prose: "she was heading home when...", "then she noticed...", "he tried to... but..." when natural.
                     - Use concrete people, objects, actions, and consequences. Name the person early so the audience can follow immediately.
                     - Avoid overloaded sentences with many clauses, stacked descriptions, semicolons, or strings of actions joined by commas.
@@ -779,14 +799,28 @@ jobs:
                     RECENT HISTORY
                     {recent_text}
 
+                    PROFESSIONAL STORY QUALITY GATE
+                    Before returning JSON, silently test the story as an editor:
+                    1. Could a viewer explain the opening problem after hearing only Scene 1?
+                    2. Is there one specific unanswered question that makes Scene 2 necessary?
+                    3. Does the protagonist make a meaningful decision rather than simply react?
+                    4. Does each scene materially change what the viewer knows or what the protagonist must do?
+                    5. Is there at least one genuine setback that makes the situation harder?
+                    6. Is the twist surprising in hindsight but completely logical from earlier clues?
+                    7. Does the ending pay off a detail, choice, object, or misunderstanding established earlier?
+                    8. Would the story still be interesting if the title were hidden?
+                    9. Can every sentence be understood naturally on first hearing?
+                    10. Does the story avoid feeling like a template, moral lesson, rescue anecdote, or random coincidence?
+                    If any answer is NO, rewrite the story before returning JSON.
+
                     FINAL SELF-CHECK
-                    Before returning JSON, silently verify: strong immediate hook; active protagonist; clear goal/problem; every scene changes the situation; at least one setback/reversal; earned payoff; material difference from recent history; consistent character/art style; natural storyteller voice; every scene visually filmable. Delete filler and repetition.
+                    Before returning JSON, silently verify: strong immediate hook; active protagonist; clear goal/problem; every scene changes the situation; at least one setback/reversal; earned payoff; material difference from recent history; consistent character/art style; professional storyteller voice; every scene visually filmable. Delete filler and repetition.
 
                     OUTPUT CONTRACT
                     Return ONLY this top-level JSON object and nothing else:
                     {{
                       "title": "short memorable hook title, 3-9 words",
-                      "hook": "10-20 word opening that creates immediate curiosity",
+                      "hook": "12-20 word opening that creates immediate curiosity without summarizing the whole story",
                       "description": "2-3 natural sentences describing the finished Short without clickbait spam",
                       "protagonist": {{
                         "name": "specific adult name",
@@ -930,7 +964,7 @@ jobs:
           # FREE TTS: edge-tts
           # ============================================================
 
-          voice = "en-US-GuyNeural"
+          voice = "en-US-AndrewNeural"
 
           run_cmd([
               sys.executable,
@@ -939,7 +973,9 @@ jobs:
               "--voice",
               voice,
               "--rate",
-              "+0%",
+              "-4%",
+              "--pitch",
+              "-1Hz",
               "--text",
               script,
               "--write-media",
