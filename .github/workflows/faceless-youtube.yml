@@ -683,6 +683,7 @@ jobs:
 
               VISUAL_PROMPT: For every scene use these labels in order, keeping each field concise but concrete:
               SCENE | PRIMARY VISUAL SUBJECT | ON-SCREEN CHARACTERS | CHARACTER | ACTION | LOCATION | MOOD | CAMERA | LIGHTING | CONTINUITY | VISUAL DIFFERENTIATION
+              IMPORTANT: In each scene object, the `scene` field MUST be a JSON integer (1, 2, 3...), never a quoted string.
 
               Use these creative starting points, not templates:
               Domain: {random.choice(DOMAINS)}
