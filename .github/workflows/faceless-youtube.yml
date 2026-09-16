@@ -317,12 +317,9 @@ jobs:
           # Groq is the ONLY LLM provider in this workflow.
           # ------------------------------------------------------------
 
-          groq_tokens_used_this_run = 0
           groq_usage_today = load_groq_usage()
-          groq_tpd_safe_budget = 200000  # Match Groq's reported 200K TPD organization limit
           primary_disabled_for_run = False
           groq_remaining_tpm = None
-          GROQ_TPM_SAFETY_MARGIN = 300
 
           def estimate_tokens(text):
               # Conservative approximation for English/JSON.
@@ -407,7 +404,7 @@ jobs:
                   raise ProviderHTTPError(provider_name, exc.code, raw) from exc
 
           def groq_json(prompt, max_tokens=2000, temperature=0.55, label="groq", response_schema=None):
-              global last_call, groq_tokens_used_this_run, primary_disabled_for_run, groq_remaining_tpm, groq_usage_today
+              global last_call, primary_disabled_for_run, groq_remaining_tpm, groq_usage_today
 
               gap = time.monotonic() - last_call
               if gap < MIN_GAP:
@@ -420,33 +417,8 @@ jobs:
                       "Groq has been disabled for this run after a daily token-limit response."
                   )
 
-              if (
-                  groq_usage_today["tokens"] + estimate > groq_tpd_safe_budget
-              ):
-                  raise RuntimeError(
-                      f"Groq proactive daily-token guard stopped {label}: estimated request "
-                      f"≈ {estimate} tokens would exceed the safe daily budget "
-                      f"({groq_tpd_safe_budget} tokens; already recorded today: "
-                      f"{groq_usage_today['tokens']})."
-                  )
-
-              if groq_tokens_used_this_run + estimate > groq_tpd_safe_budget:
-                  raise RuntimeError(
-                      f"Groq proactive per-run guard stopped {label}: estimated request "
-                      f"≈ {estimate} tokens would exceed the safe per-run budget "
-                      f"({groq_tpd_safe_budget} tokens)."
-                  )
-
-              if (
-                  groq_remaining_tpm is not None
-                  and estimate + GROQ_TPM_SAFETY_MARGIN >= groq_remaining_tpm
-              ):
-                  raise RuntimeError(
-                      f"Groq proactive TPM guard stopped {label}: estimated request "
-                      f"≈ {estimate} tokens + safety margin {GROQ_TPM_SAFETY_MARGIN} "
-                      f"is too close to latest TPM remaining {groq_remaining_tpm}."
-                  )
-
+              # Groq is the source of truth for live limits; do not locally reject
+              # requests using stale persisted usage or token estimates.
               payload = make_payload(prompt, max_tokens, temperature, response_schema)
               print(f"[Groq] {label} estimated request tokens ≈ {estimate}", flush=True)
               print(f"[Groq] {label} attempt 1/2", flush=True)
@@ -468,7 +440,6 @@ jobs:
 
                   actual_tokens = parse_provider_usage(data)
                   accounted_tokens = actual_tokens if actual_tokens > 0 else estimate
-                  groq_tokens_used_this_run += accounted_tokens
                   groq_usage_today["tokens"] += accounted_tokens
                   save_groq_usage(groq_usage_today)
                   remaining_tpm = headers.get("x-ratelimit-remaining-tokens")
@@ -528,7 +499,6 @@ jobs:
                           raise RuntimeError(f"{label} retry returned non-object JSON.")
                       actual_tokens = parse_provider_usage(retry_data)
                       accounted_tokens = actual_tokens if actual_tokens > 0 else estimate
-                      groq_tokens_used_this_run += accounted_tokens
                       groq_usage_today["tokens"] += accounted_tokens
                       save_groq_usage(groq_usage_today)
                       retry_remaining_tpm = retry_headers.get("x-ratelimit-remaining-tokens")
