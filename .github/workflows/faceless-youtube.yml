@@ -573,157 +573,130 @@ jobs:
 
           def create_story():
               prompt = f"""
-                    You are the showrunner, head writer, storyboard director, and visual continuity supervisor
-                    for a premium original animated Shorts studio.
+                    ROLE
+                    You are the showrunner, head writer, storyboard director, and visual-continuity supervisor
+                    for a premium original animated Shorts studio. Create ONE memorable 35–60 second mini-film:
+                    specific, visual, entertaining, emotionally earned, and authored rather than templated.
 
-                    YOUR JOB
-                    Create ONE genuinely memorable 35–60 second mini-film that feels authored, specific,
-                    visual, and emotionally earned. It must work as entertainment first, not as a motivational
-                    template. The viewer should understand the situation quickly, care about the outcome,
-                    and feel that the ending was worth waiting for.
+                    CORE STORY STANDARD
+                    Build around specific people, a concrete visible goal, a visible obstacle, escalating consequences,
+                    one meaningful choice, and an earned payoff. The viewer should understand the situation quickly,
+                    care what happens, and feel the ending was worth waiting for.
+                    Avoid AI-story fingerprints: generic lessons, convenient strangers, random luck, recycled rescues,
+                    empty suspense, fake cliffhangers, over-explaining, and interchangeable plots.
 
-                    CREATIVE NORTH STAR
-                    Think like a strong short-film writer:
-                    specific people + a concrete goal + a visible obstacle + escalating consequences +
-                    one meaningful choice + an earned payoff.
-                    Avoid "AI story" fingerprints: generic lessons, convenient strangers, random luck,
-                    recycled rescues, empty suspense, fake cliffhangers, over-explaining, and interchangeable plots.
-
-                    ORIGINALITY
-                    - Recent history is a collision-warning, not a template library.
-                    - Do not merely swap names, clothes, colors, animals, or locations.
-                    - Change the underlying premise, character motivation, conflict mechanism, escalation,
-                      visual motif, reversal, and ending logic.
-                    - Avoid repeating the same emotional arc or the same type of final reveal.
-                    - The protagonist must have agency; what they notice, choose, attempt, or refuse must matter.
-                    - Never copy, paraphrase, imitate, or reconstruct another creator's video, movie scene,
-                      viral story, meme, Reddit story, or recognizable plot.
-                    - Prefer stories built around one memorable "what if" that could only happen because of
-                      the specific people and place in THIS story.
+                    ORIGINALITY — NON-NEGOTIABLE
+                    Recent history is only a collision warning. Do NOT disguise an old story with new names, clothes,
+                    colors, animals, or locations. Materially vary the underlying premise, protagonist motivation,
+                    conflict mechanism, escalation path, visual motif, reversal logic, emotional register, and ending.
+                    Do not repeat the same emotional arc or reveal type back-to-back. The protagonist must have agency:
+                    what they notice, choose, attempt, or refuse must affect the outcome.
+                    Never copy, paraphrase, imitate, or reconstruct another creator's video, film scene, viral story,
+                    meme, Reddit story, or recognizable plot. Prefer one memorable "what if" specific to THIS people/place.
 
                     RETENTION WITHOUT CLICKBAIT
-                    Build:
-                    HOOK -> CLEAR SITUATION -> QUESTION -> GOAL -> ATTEMPT -> COMPLICATION ->
-                    ESCALATION -> CHOICE -> CONSEQUENCE -> REVEAL/PAYOFF.
-                    This is a flexible spine, not a formula. Skip or rearrange beats when a better story demands it.
-                    Every 1–2 scenes should create a meaningful change in information, action, risk, relationship,
-                    object state, or plan.
-                    At least one attempt must fail, backfire, or reveal a new constraint.
-                    The ending must be caused by earlier actions, clues, objects, promises, mistakes, or choices.
-                    Do not solve the final problem with luck, coincidence, unexplained authority, sudden wealth,
-                    a magical fix, or a stranger who appears only to save everyone.
+                    Use this flexible causal spine when useful:
+                    HOOK → CLEAR SITUATION → QUESTION → GOAL → ATTEMPT → COMPLICATION → ESCALATION → CHOICE →
+                    CONSEQUENCE → REVEAL/PAYOFF.
+                    It is NOT a rigid template. Every 1–2 scenes should meaningfully change information, action, risk,
+                    relationship, object state, or plan. At least one attempt must fail, backfire, or reveal a constraint.
+                    The payoff must be caused by earlier actions, clues, objects, promises, mistakes, or choices.
+                    Never solve the final problem with luck, coincidence, unexplained authority, sudden wealth,
+                    magic, or a stranger who appears only to fix everything.
 
                     OPENING
-                    Scene 1 must sound like the first sentence of a skilled person telling a friend something
-                    surprising that really happened. Introduce the protagonist naturally inside an action or routine,
-                    then reveal a precise interruption, discovery, mistake, or decision.
-                    The audience should know who is involved and what they were doing before the unusual event
-                    fully unfolds.
-                    Vary openings across episodes:
-                    - ordinary routine interrupted
-                    - relationship-based moment
-                    - confident decision with an unseen cost
-                    - small visual inconsistency
-                    - immediate practical problem
-                    - social misunderstanding
-                    Never use a fixed "There was a boy named..." pattern, "One day...", weather-only openings,
+                    Scene 1 must sound like the first sentence of a skilled person telling a friend something surprising.
+                    Introduce the protagonist naturally inside a routine/action, then reveal a precise disruption,
+                    discovery, mistake, decision, or problem. Let the audience know who is involved before the unusual
+                    event fully unfolds. Vary opening mechanisms across episodes: ordinary routine interrupted,
+                    relationship moment, confident decision with hidden cost, tiny visual inconsistency,
+                    immediate practical problem, or social misunderstanding.
+                    Never use fixed "There was a boy named..." / "One day..." openings, weather-only openings,
                     biography dumps, trailer narration, quotes, viewer-directed questions, or empty mystery language.
 
                     STORY LOGIC
-                    - One primary adult protagonist with a clear personality shown through behavior.
+                    - One primary adult protagonist with personality shown through behavior.
                     - Up to two important supporting characters unless more are truly necessary.
-                    - One concrete visible goal.
-                    - One understandable external obstacle.
-                    - One choice with a cost, risk, tradeoff, or social consequence.
+                    - One concrete visible goal and one understandable external obstacle.
+                    - One meaningful choice with cost, risk, tradeoff, or social consequence.
                     - At least one setback, failed attempt, reversal, or discovery.
                     - Earlier details should become useful later whenever possible.
-                    - The final beat should close the causal loop instead of explaining the moral.
-                    - Meaning must emerge from the event itself, not a speech.
+                    - Close the causal loop through action; never finish with a moral speech.
+                    - Meaning must emerge from the event itself.
 
                     NATURAL NARRATION
-                    Write spoken English, not literary prose.
-                    The voice should feel conversational, confident, vivid, and easy to understand on first listen.
-                    Use concrete names and actions early.
-                    Prefer short-to-medium sentences with varied rhythm.
-                    Every scene narration is ONE sentence and describes only what the storyteller needs to tell us,
-                    not every visual detail already visible on screen.
-                    Add the reason, surprise, clue, consequence, or emotional meaning that makes the image matter.
-                    Avoid stiff phrases, essay language, generic inspiration, fake suspense, "you won't believe",
-                    "watch until the end", "life lesson", "moral of the story", and repetitive catchphrases.
+                    Write spoken English, not literary prose: conversational, confident, vivid, easy to understand
+                    on first listen. Use concrete names/actions early, with varied short-to-medium rhythm.
+                    Each scene narration is ONE sentence. Narrate what the storyteller adds beyond the image:
+                    reason, surprise, clue, consequence, or emotional meaning. Do not narrate every visible movement.
+                    Avoid stiff/essay language, generic inspiration, fake suspense, "you won't believe", "watch until the end",
+                    "life lesson", "moral of the story", and repetitive catchphrases.
 
                     VISUAL-FIRST STORYTELLING
-                    This is an illustrated film, not a slideshow.
-                    Every scene must contain a single dominant physical action or visual change that can be understood
-                    without narration.
-                    Show cause and effect physically: a hand reaches, an object changes state, a door blocks a path,
-                    a person reacts, evidence appears, a plan fails, a character chooses, a relationship shifts.
-                    Do not spend scenes on invisible thoughts alone.
+                    This is an illustrated film, not a slideshow. Every scene must have ONE dominant physical action
+                    or visible change understandable without narration. Show cause/effect physically: hands reach,
+                    objects change state, paths are blocked, people react, evidence appears, plans fail, choices happen,
+                    relationships shift. Do not spend scenes on invisible thoughts alone.
 
                     CHARACTER BIBLE — IMMUTABLE
-                    Create a protagonist with an unusually specific, repeatable identity:
-                    exact adult age; face shape; eye shape and color; eyebrow shape; hairstyle and hair color;
-                    skin tone; body build; approximate height impression; signature everyday outfit with exact garment
-                    colors; exact shoes; and ONE distinctive accessory or prop.
-                    Make the identity easy for an image model to reproduce.
-                    Once established, these traits are LOCKED for the entire story.
-                    No hairstyle drift, age drift, body-shape drift, wardrobe redesign, color drift, or accessory loss.
-                    If a supporting character returns, give them the same level of locked detail.
-                    Keep wardrobes normal, tasteful, practical, family-friendly, and consistent.
+                    Create a highly specific, repeatable adult protagonist: exact age; face shape; eye shape/color;
+                    eyebrow shape; hairstyle/color; skin tone; body build; height impression; signature everyday outfit
+                    with exact garment colors; exact shoes; ONE distinctive accessory/prop. Make it easy for an image model
+                    to reproduce. LOCK every identity trait across the whole story: no hairstyle/age/body/wardrobe/color drift
+                    and no missing accessory. Any returning supporting character gets the same locked treatment.
+                    Wardrobes must stay practical, tasteful, family-friendly, and consistent.
 
-                    MASTER VISUAL UNIVERSE
-                    The entire episode must look like frames from the SAME premium hand-drawn 2D animated film:
-                    expressive stylized human characters; slightly exaggerated but believable anatomy; large expressive
-                    eyes; strong readable eyebrows and mouths; distinctive facial shapes; clean confident dark ink
-                    outlines with varied line weight; painterly digital coloring; subtle cel shading; soft tonal
-                    gradients; gentle textured brushwork; rich slightly muted cinematic colors; coherent warm/cool
-                    harmony; believable perspective; strong foreground/midground/background depth; atmospheric
-                    lighting; realistic cast/contact shadows; polished environment detail; story-driven composition.
+                    MASTER VISUAL UNIVERSE — LOCKED
+                    Every scene must look like the SAME premium hand-drawn 2D animated film:
+                    expressive stylized humans; slightly exaggerated but believable anatomy; large expressive eyes;
+                    readable eyebrows/mouths; distinctive facial shapes; clean confident dark ink outlines with varied
+                    line weight; painterly digital color; subtle cel shading; soft gradients; gentle textured brushwork;
+                    rich slightly muted cinematic colors; coherent warm/cool harmony; believable perspective;
+                    strong foreground/midground/background depth; atmospheric lighting; realistic cast/contact shadows;
+                    polished environmental detail; story-driven composition.
                     Never photorealistic, live-action, 3D CGI, anime, manga, chibi, flat vector, preschool art,
                     clip-art, or generic AI cartoon styling.
 
                     SCENE DESIGN
-                    Every scene is a NEW film frame, not a portrait variant.
-                    Give the viewer a different visual beat through action, subject, composition, location zone,
-                    prop state, character interaction, or camera language.
-                    Use a deliberate visual rhythm such as:
-                    wide establish -> medium action -> close clue -> reaction -> two-shot interaction ->
-                    dynamic angle -> reveal -> payoff.
-                    Vary shot scale and camera angle while keeping the same art universe.
-                    Important actions must stay readable inside the vertical 9:16 frame.
-                    Favor active poses, clear silhouettes, believable hands, purposeful eye-lines, grounded feet,
-                    realistic weight, depth layers, environmental storytelling, and meaningful props.
-                    Avoid clutter, duplicate characters, duplicate props, broken anatomy, impossible hands,
+                    Every scene is a NEW film frame, not a portrait variant. Change the visual beat through action,
+                    subject, composition, location zone, prop state, interaction, or camera language. Use visual rhythm
+                    such as wide establish → medium action → close clue → reaction → interaction → dynamic angle → reveal → payoff,
+                    but vary it naturally. Vary shot scale/angle while preserving the same art universe.
+                    Keep important action readable in vertical 9:16. Favor active poses, clear silhouettes, believable hands,
+                    purposeful eye-lines, grounded feet, realistic weight, depth layers, environmental storytelling,
+                    and meaningful props. Avoid clutter, duplicate characters/props, broken anatomy, impossible hands,
                     floating objects, or random background faces.
 
                     PRIMARY SUBJECT RULE
-                    Each scene has ONE PRIMARY VISUAL SUBJECT: the person or object whose action is the reason
-                    this frame exists.
-                    If the narration says a supporting character arrives, speaks, warns, receives something,
-                    searches, chases, hides, fixes, or reacts, that character must be visible and visually important.
-                    Do not keep defaulting to the protagonist when the story beat belongs to someone else.
-                    When two characters interact, show the interaction itself.
-                    Named characters must never look like duplicated versions of each other.
-                    Background crowds must remain generic and distinct.
+                    Each scene has ONE PRIMARY VISUAL SUBJECT: the person/object whose action makes the frame necessary.
+                    If narration says a supporting character arrives, speaks, warns, receives, searches, chases, hides,
+                    fixes, or reacts, that character MUST be visible and visually important. Do not default to the protagonist
+                    when the beat belongs to someone else. Show character interactions physically. Named characters must never
+                    look like copies; crowds must remain generic and distinct.
 
-                    SCENE BLUEPRINT CONTRACT
-                    For EVERY scene, visual_prompt MUST contain these labeled fields in this order:
+                    SCENE BLUEPRINT
+                    Every visual_prompt MUST use these labels in this order:
                     SCENE: one frozen cinematic moment
-                    PRIMARY VISUAL SUBJECT: one person or object
-                    ON-SCREEN CHARACTERS: every story-relevant character physically visible, with unique identifiers
-                    CHARACTER: full locked identity of the primary character if a person is central
-                    ACTION: exactly what is physically happening and who is doing it
-                    LOCATION: specific environment and important objects
-                    MOOD: emotion expressed through face, body language, lighting, and atmosphere
-                    CAMERA: shot size, angle, camera height, composition, and visual priority
-                    LIGHTING: key light, color temperature, time/weather, shadow behavior
-                    CONTINUITY: exact identity/wardrobe/prop details that MUST remain unchanged
+                    PRIMARY VISUAL SUBJECT: one person/object
+                    ON-SCREEN CHARACTERS: every relevant visible character with unique identifiers
+                    CHARACTER: full locked identity of the primary character when a person is central
+                    ACTION: exactly what physically happens and who does it
+                    LOCATION: specific environment + important objects
+                    MOOD: emotion shown through face/body/light/atmosphere
+                    CAMERA: shot size, angle, height, composition, visual priority
+                    LIGHTING: key light, color temperature, time/weather, shadows
+                    CONTINUITY: exact identity/wardrobe/prop details that MUST stay unchanged
                     VISUAL DIFFERENTIATION: what changed from the previous scene and why this frame is different
+                    The prompt must be concrete enough for an illustrator to stage immediately; never rely on vague
+                    "cinematic scene" wording. If a supporting character performs or receives the named action,
+                    they must be the visual focus. If two characters interact, show the interaction itself.
 
-                    The visual prompt should be concrete enough that an illustrator could stage the shot immediately.
-                    Avoid vague phrases such as "cinematic scene" without specifying what the camera is actually seeing.
+                    SAFETY / TONE
+                    No graphic gore, sexual content, hateful content, child endangerment, supernatural powers,
+                    magic, miracles, or traumatic shock bait. Non-graphic tension, danger, crime-like situations,
+                    weapons, or chase elements may exist when story-relevant, but never provide instructions for wrongdoing/harm.
 
-                    DIVERSIFIERS
-                    Use these as ingredients, not as mandatory templates:
+                    DIVERSIFIERS — INGREDIENTS, NOT TEMPLATES
                     Domain: {random.choice(DOMAINS)}
                     Setting: {random.choice(SETTINGS)}
                     Emotional flavor: {random.choice(EMOTIONS)}
@@ -734,22 +707,12 @@ jobs:
                     RECENT HISTORY
                     {recent_text}
 
-                    FINAL INTERNAL CHECK
-                    Before returning JSON, silently check:
-                    1) Is the premise specific and materially different from recent history?
-                    2) Does the protagonist actively cause the story to move?
-                    3) Is there a concrete visible goal and obstacle?
-                    4) Does every scene change something?
-                    5) Is there a real setback or complication?
-                    6) Is the ending earned by earlier details?
-                    7) Does the opening sound natural when read aloud?
-                    8) Are all characters visually distinct and locked?
-                    9) Does each scene have a distinct primary subject and composition?
-                    10) Could every scene be understood visually?
-                    Delete filler before returning JSON.
+                    FINAL CHECK BEFORE JSON
+                    Verify: specific/original premise; active protagonist; visible goal + obstacle; meaningful progression;
+                    real setback/reversal; earned payoff; natural opening; distinct/locked characters; distinct visual beats;
+                    filmable scenes; no filler; no repeated template.
 
-                    OUTPUT CONTRACT
-                    Return ONLY this top-level JSON object:
+                    OUTPUT — RETURN ONLY THIS JSON OBJECT
                     {{
                       "title": "short memorable title, 3-9 words",
                       "hook": "10-20 word curiosity-driven opening",
@@ -771,25 +734,20 @@ jobs:
                     }}
 
                     SCENE CONTRACT
-                    - Produce 8-10 scenes; prefer 8 when sufficient, and use 9-10 only when each added scene creates genuine progression. Never pad.
-                    - Target 18-22 narration words per scene; hard range 12-26.
-                    - TOTAL NARRATION TARGET: deliberately aim for 185-205 words so the first generation comfortably clears the validator minimum.
-                    - Before returning JSON, silently count the combined scene narration. If below 170 words, naturally enrich the existing scenes with useful cause, consequence, reaction, or sensory detail until the total is 180-205 words. Do NOT add filler or create new scenes just to increase word count.
+                    - Produce 8-10 scenes; prefer 8 when sufficient; use 9-10 only when each adds genuine progression. Never pad.
+                    - Target 18-22 narration words/scene; hard range 12-26.
+                    - Target 185-205 total narration words so the first generation comfortably clears validation.
+                    - If total is below 170, enrich existing scenes with useful cause/consequence/reaction/detail; do NOT add filler.
                     - Every narration is exactly ONE natural spoken sentence.
                     - Scene 1: natural character introduction + immediate specific disruption/question.
-                    - Scene 2: make the problem concrete.
-                    - Scene 3: clarify the real goal, risk, or difficult choice.
-                    - Middle: attempts, clues, complications, setbacks, discoveries, escalation, or reversal.
-                    - Final scenes: consequence + satisfying payoff directly connected to earlier events.
-                    - Never repeat essentially the same action in consecutive scenes.
-                    - Never use filler reaction shots with no narrative purpose.
-                    - Before returning each scene, identify WHO the audience should watch and WHY.
-                    - The PRIMARY VISUAL SUBJECT must match the person or object performing/receiving the action named in narration.
-                    - If a new named character matters, establish them visually in that scene.
-                    - When attention transfers from the protagonist to another character, transfer the visual focus too.
-                    - Background crowds never contain duplicate copies of named characters.
-                    - Avoid abbreviations such as Mr., Mrs., Ms., Dr., St. in narration when possible.
-                    - No semicolons, em dashes, or multiple sentence-ending marks in scene narration.
+                    - Scene 2: problem becomes concrete. Scene 3: goal/risk/choice becomes clear.
+                    - Middle: attempts, clues, complications, setbacks, discoveries, escalation, reversal.
+                    - Final scenes: consequence + satisfying payoff caused by earlier events.
+                    - Never repeat essentially the same action in consecutive scenes or add filler reaction shots.
+                    - PRIMARY VISUAL SUBJECT must match the person/object performing or receiving the narrated action.
+                    - Establish important new characters visually when they matter; transfer camera focus when attention transfers.
+                    - Background crowds never duplicate named characters.
+                    - Avoid Mr./Mrs./Ms./Dr./St. in narration when possible; no semicolons, em dashes, or multiple sentence-ending marks.
               """
 
 
