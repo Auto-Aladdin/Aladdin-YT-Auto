@@ -25,7 +25,6 @@ jobs:
       - name: Generate story, images, voice and video
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
-          LLM7_API_KEY: ${{ secrets.LLM7_API_KEY }}
           POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
         run: |
           set -euo pipefail
@@ -57,10 +56,6 @@ jobs:
           API_URL = "https://api.groq.com/openai/v1/chat/completions"
           MODEL = "openai/gpt-oss-20b"
 
-          # Backup LLM7.io gateway (OpenAI-compatible).
-          BACKUP_API_URL = "https://api.llm7.io/v1/chat/completions"
-          BACKUP_MODEL = "gemini-3.1-flash-lite"
-
           ROOT = Path(".")
           OUT = ROOT / "short-output"
           ASSETS = OUT / "assets"
@@ -70,7 +65,6 @@ jobs:
           HISTORY_FILE = ROOT / ".github" / "data" / "story_history.json"
 
           API_KEY = os.environ["GROQ_API_KEY"]
-          BACKUP_API_KEY = os.environ.get("LLM7_API_KEY", "").strip()
 
           MIN_WORDS = 165
           MAX_WORDS = 230
@@ -318,14 +312,8 @@ jobs:
           }
 
           # ------------------------------------------------------------
-          # Token-aware LLM dispatcher
-          #
-          # Primary: Groq gpt-oss-20b
-          # Backup:  LLM7.io Gemini 3.1 Flash Lite
-          #
-          # Groq does not expose daily TPD remaining in normal success
-          # headers, so we combine a conservative in-run guard with
-          # immediate failover on explicit daily-limit responses.
+          # Token-aware Groq dispatcher
+          # Groq is the ONLY LLM provider in this workflow.
           # ------------------------------------------------------------
 
           groq_tokens_used_this_run = 0
@@ -335,8 +323,7 @@ jobs:
           GROQ_TPM_SAFETY_MARGIN = 300
 
           def estimate_tokens(text):
-              # Conservative approximation for English/JSON. We intentionally
-              # overestimate a little to switch before the hard daily ceiling.
+              # Conservative approximation for English/JSON.
               return max(1, math.ceil(len(text) / 4.0))
 
           def parse_provider_usage(data):
@@ -356,9 +343,9 @@ jobs:
                   or ("rate_limit_exceeded" in low and "200000" in low)
               )
 
-          def make_payload(model, prompt, max_tokens, temperature, response_schema, backup=False):
-              payload = {
-                  "model": model,
+          def make_payload(prompt, max_tokens, temperature, response_schema):
+              return {
+                  "model": MODEL,
                   "messages": [
                       {
                           "role": "system",
@@ -370,26 +357,23 @@ jobs:
                       },
                       {"role": "user", "content": prompt},
                   ],
+                  "reasoning_effort": "low",
+                  "include_reasoning": False,
                   "temperature": temperature,
+                  "max_completion_tokens": max_tokens,
+                  "response_format": (
+                      {
+                          "type": "json_schema",
+                          "json_schema": {
+                              "name": response_schema["name"],
+                              "strict": True,
+                              "schema": response_schema["schema"],
+                          },
+                      }
+                      if response_schema
+                      else {"type": "json_object"}
+                  ),
               }
-
-              if response_schema and not backup:
-                  payload["reasoning_effort"] = "low"
-                  payload["include_reasoning"] = False
-                  payload["max_completion_tokens"] = max_tokens
-                  payload["response_format"] = {
-                      "type": "json_schema",
-                      "json_schema": {
-                          "name": response_schema["name"],
-                          "strict": True,
-                          "schema": response_schema["schema"],
-                      },
-                  }
-              else:
-                  payload["max_tokens"] = max_tokens
-                  payload["response_format"] = {"type": "json_object"}
-
-              return payload
 
           class ProviderHTTPError(RuntimeError):
               def __init__(self, provider, code, raw):
@@ -410,7 +394,6 @@ jobs:
                   },
                   method="POST",
               )
-
               started = time.monotonic()
               try:
                   with urllib.request.urlopen(req, timeout=HTTP_TIMEOUT) as r:
@@ -421,18 +404,7 @@ jobs:
                   raw = exc.read().decode("utf-8", errors="replace")
                   raise ProviderHTTPError(provider_name, exc.code, raw) from exc
 
-          def run_provider_request(
-              provider_name,
-              url,
-              key,
-              model,
-              prompt,
-              max_tokens,
-              temperature,
-              label,
-              response_schema,
-              backup=False,
-          ):
+          def groq_json(prompt, max_tokens=2000, temperature=0.55, label="groq", response_schema=None):
               global last_call, groq_tokens_used_this_run, primary_disabled_for_run, groq_remaining_tpm
 
               gap = time.monotonic() - last_call
@@ -441,219 +413,112 @@ jobs:
 
               estimate = estimate_tokens(prompt) + max_tokens
 
-              if provider_name == "Groq":
-                  if primary_disabled_for_run:
-                      raise ProviderHTTPError(
-                          "Groq",
-                          429,
-                          "Local proactive guard: Groq disabled for this run after a daily-token exhaustion response.",
-                      )
+              if primary_disabled_for_run:
+                  raise RuntimeError(
+                      "Groq has been disabled for this run after a daily token-limit response."
+                  )
 
-                  if groq_tokens_used_this_run + estimate > groq_tpd_safe_budget:
-                      raise ProviderHTTPError(
-                          "Groq",
-                          429,
-                          "Local proactive TPD guard: estimated request would exceed the safe Groq budget for this run.",
-                      )
+              if groq_tokens_used_this_run + estimate > groq_tpd_safe_budget:
+                  raise RuntimeError(
+                      f"Groq proactive daily-token guard stopped {label}: estimated request "
+                      f"≈ {estimate} tokens would exceed the safe per-run budget "
+                      f"({groq_tpd_safe_budget} tokens)."
+                  )
 
-                  if (
-                      groq_remaining_tpm is not None
-                      and estimate + GROQ_TPM_SAFETY_MARGIN >= groq_remaining_tpm
-                  ):
-                      raise ProviderHTTPError(
-                          "Groq",
-                          429,
-                          f"Local proactive TPM guard: estimated request ({estimate}) + safety margin "
-                          f"({GROQ_TPM_SAFETY_MARGIN}) is too close to the latest Groq TPM remaining "
-                          f"({groq_remaining_tpm}).",
-                      )
+              if (
+                  groq_remaining_tpm is not None
+                  and estimate + GROQ_TPM_SAFETY_MARGIN >= groq_remaining_tpm
+              ):
+                  raise RuntimeError(
+                      f"Groq proactive TPM guard stopped {label}: estimated request "
+                      f"≈ {estimate} tokens + safety margin {GROQ_TPM_SAFETY_MARGIN} "
+                      f"is too close to latest TPM remaining {groq_remaining_tpm}."
+                  )
 
-              payload = make_payload(
-                  model,
-                  prompt,
-                  max_tokens,
-                  temperature,
-                  response_schema,
-                  backup=backup,
-              )
-
-              print(
-                  f"[{provider_name}] {label} estimated request tokens ≈ {estimate}",
-                  flush=True,
-              )
-              print(f"[{provider_name}] {label} attempt 1/2", flush=True)
-
+              payload = make_payload(prompt, max_tokens, temperature, response_schema)
+              print(f"[Groq] {label} estimated request tokens ≈ {estimate}", flush=True)
+              print(f"[Groq] {label} attempt 1/2", flush=True)
               last_call = time.monotonic()
 
               try:
-                  data, headers, elapsed = post_json(
-                      url, key, payload, provider_name
-                  )
-
+                  data, headers, elapsed = post_json(API_URL, API_KEY, payload, "Groq")
                   content = data["choices"][0]["message"].get("content", "")
                   if not content:
-                      raise RuntimeError(f"{provider_name} returned empty content.")
-
+                      raise RuntimeError("Groq returned empty content.")
                   try:
                       obj = json.loads(content)
                   except json.JSONDecodeError as exc:
-                      raise RuntimeError(
-                          f"{provider_name} returned invalid JSON: {exc}"
-                      ) from exc
-
+                      raise RuntimeError(f"Groq returned invalid JSON: {exc}") from exc
                   if isinstance(obj, list) and len(obj) == 1 and isinstance(obj[0], dict):
                       obj = obj[0]
-
                   if not isinstance(obj, dict):
-                      raise RuntimeError(
-                          f"{label} must return a JSON object, got {type(obj).__name__}"
-                      )
+                      raise RuntimeError(f"{label} must return a JSON object, got {type(obj).__name__}")
 
                   actual_tokens = parse_provider_usage(data)
-                  if provider_name == "Groq":
-                      groq_tokens_used_this_run += (
-                          actual_tokens if actual_tokens > 0 else estimate
-                      )
-                      remaining_tpm = headers.get("x-ratelimit-remaining-tokens")
-                      if remaining_tpm:
-                          try:
-                              groq_remaining_tpm = int(remaining_tpm)
-                          except (TypeError, ValueError):
-                              groq_remaining_tpm = None
-                          print(
-                              f"[Groq] {label} TPM remaining: {remaining_tpm}",
-                              flush=True,
-                          )
+                  groq_tokens_used_this_run += actual_tokens if actual_tokens > 0 else estimate
+                  remaining_tpm = headers.get("x-ratelimit-remaining-tokens")
+                  if remaining_tpm:
+                      try:
+                          groq_remaining_tpm = int(remaining_tpm)
+                      except (TypeError, ValueError):
+                          groq_remaining_tpm = None
+                      print(f"[Groq] {label} TPM remaining: {remaining_tpm}", flush=True)
 
                   print(
-                      f"[{provider_name}] {label} success in {elapsed:.2f}s "
+                      f"[Groq] {label} success in {elapsed:.2f}s "
                       f"(usage={actual_tokens or 'unknown'} tokens)",
                       flush=True,
                   )
                   return obj
 
               except ProviderHTTPError as exc:
-                  print(
-                      f"[{exc.provider}] HTTP {exc.code} {label}",
-                      flush=True,
-                  )
+                  print(f"[Groq] HTTP {exc.code} {label}", flush=True)
 
-                  if exc.provider == "Groq" and exc.code == 429 and groq_daily_exhausted(exc.raw):
+                  # TPD exhaustion is deterministic: do not retry and do not
+                  # silently switch to a paid provider.
+                  if exc.code == 429 and groq_daily_exhausted(exc.raw):
                       primary_disabled_for_run = True
-                      raise
+                      raise RuntimeError(
+                          "Groq daily token limit reached during " + label + ". "
+                          "This workflow is intentionally Groq-only, so it stops cleanly.\n"
+                          + exc.raw
+                      ) from exc
 
+                  # Keep one retry for transient 429s that are NOT daily TPD.
                   if exc.code == 429:
                       time.sleep(2.0)
+                      retry_data, retry_headers, retry_elapsed = post_json(
+                          API_URL, API_KEY, payload, "Groq"
+                      )
+                      retry_content = retry_data["choices"][0]["message"].get("content", "")
+                      if not retry_content:
+                          raise RuntimeError("Groq returned empty content on retry.")
                       try:
-                          retry_data, retry_headers, retry_elapsed = post_json(
-                              url, key, payload, provider_name
-                          )
-                          retry_content = retry_data["choices"][0]["message"].get("content", "")
-                          if not retry_content:
-                              raise RuntimeError(
-                                  f"{provider_name} returned empty content on retry."
-                              )
-
+                          retry_obj = json.loads(retry_content)
+                      except json.JSONDecodeError as retry_exc:
+                          raise RuntimeError(
+                              f"Groq returned invalid JSON on retry: {retry_exc}"
+                          ) from retry_exc
+                      if isinstance(retry_obj, list) and len(retry_obj) == 1 and isinstance(retry_obj[0], dict):
+                          retry_obj = retry_obj[0]
+                      if not isinstance(retry_obj, dict):
+                          raise RuntimeError(f"{label} retry returned non-object JSON.")
+                      actual_tokens = parse_provider_usage(retry_data)
+                      groq_tokens_used_this_run += actual_tokens if actual_tokens > 0 else estimate
+                      retry_remaining_tpm = retry_headers.get("x-ratelimit-remaining-tokens")
+                      if retry_remaining_tpm:
                           try:
-                              retry_obj = json.loads(retry_content)
-                          except json.JSONDecodeError as retry_exc:
-                              raise RuntimeError(
-                                  f"{provider_name} returned invalid JSON on retry: {retry_exc}"
-                              ) from retry_exc
-
-                          if isinstance(retry_obj, list) and len(retry_obj) == 1 and isinstance(retry_obj[0], dict):
-                              retry_obj = retry_obj[0]
-
-                          if not isinstance(retry_obj, dict):
-                              raise RuntimeError(
-                                  f"{label} retry returned non-object JSON."
-                              )
-
-                          actual_tokens = parse_provider_usage(retry_data)
-                          if provider_name == "Groq":
-                              groq_tokens_used_this_run += (
-                                  actual_tokens if actual_tokens > 0 else estimate
-                              )
-                              retry_remaining_tpm = retry_headers.get("x-ratelimit-remaining-tokens")
-                              if retry_remaining_tpm:
-                                  try:
-                                      groq_remaining_tpm = int(retry_remaining_tpm)
-                                  except (TypeError, ValueError):
-                                      groq_remaining_tpm = None
-
-                          print(
-                              f"[{provider_name}] {label} retry success in {retry_elapsed:.2f}s "
-                              f"(usage={actual_tokens or 'unknown'} tokens)",
-                              flush=True,
-                          )
-                          return retry_obj
-                      except ProviderHTTPError:
-                          raise
+                              groq_remaining_tpm = int(retry_remaining_tpm)
+                          except (TypeError, ValueError):
+                              groq_remaining_tpm = None
+                      print(
+                          f"[Groq] {label} retry success in {retry_elapsed:.2f}s "
+                          f"(usage={actual_tokens or 'unknown'} tokens)",
+                          flush=True,
+                      )
+                      return retry_obj
 
                   raise
-
-          def groq_json(
-              prompt,
-              max_tokens=2000,
-              temperature=0.55,
-              label="groq",
-              response_schema=None,
-          ):
-              # Primary Groq first, automatic LLM7 failover only when the
-              # primary is unavailable because of TPD/proactive quota guarding.
-              try:
-                  return run_provider_request(
-                      "Groq",
-                      API_URL,
-                      API_KEY,
-                      MODEL,
-                      prompt,
-                      max_tokens,
-                      temperature,
-                      label,
-                      response_schema,
-                      backup=False,
-                  )
-              except Exception as primary_exc:
-                  should_fallback = (
-                      isinstance(primary_exc, ProviderHTTPError)
-                      and primary_exc.provider == "Groq"
-                      and (
-                          groq_daily_exhausted(primary_exc.raw)
-                          or "proactive TPD guard" in primary_exc.raw
-                      )
-                  )
-
-                  if not should_fallback:
-                      raise
-
-                  if not BACKUP_API_KEY:
-                      raise RuntimeError(
-                          "Groq is unavailable because of its daily token budget, "
-                          "and LLM7_API_KEY is not configured. "
-                          "Add GitHub secret LLM7_API_KEY for automatic backup.\n"
-                          + str(primary_exc)
-                      ) from primary_exc
-
-                  reason = "proactive quota guard" if "proactive" in primary_exc.raw.lower() else "Groq daily token limit"
-                  print(
-                      f"[Fallback] Groq unavailable for {label} ({reason}); switching to "
-                      f"LLM7.io {BACKUP_MODEL}.",
-                      flush=True,
-                  )
-
-                  return run_provider_request(
-                      "LLM7",
-                      BACKUP_API_URL,
-                      BACKUP_API_KEY,
-                      BACKUP_MODEL,
-                      prompt,
-                      min(max_tokens, 1800),
-                      temperature,
-                      label,
-                      response_schema,
-                      backup=True,
-                  )
 
           def banned(text):
               lower = text.lower()
