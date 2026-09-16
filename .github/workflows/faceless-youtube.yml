@@ -44,8 +44,8 @@ jobs:
           # ============================================================
           # MISSION
           # ============================================================
-          # One daily faceless motivational/emotional Short:
-          # story -> scene image -> free TTS -> captions -> motion video
+          # One automated faceless animated entertainment Short:
+          # story -> scene image -> free TTS -> timing data -> motion video
           #
           # Designed for GitHub Actions so the user's computer does not
           # need to stay online.
@@ -143,14 +143,14 @@ jobs:
           ]
 
           HOOK_MODES = [
-              "start during a chase or escape",
-              "start the instant something goes unexpectedly wrong",
-              "start with a character discovering a strange detail",
-              "start with a risky decision already being made",
-              "start with an object being opened, dropped, swapped, or revealed",
-              "start at the exact moment a plan begins to fail",
-              "start with a surprising accusation or misunderstanding",
-              "start with an ordinary task interrupted by a bizarre event",
+              "introduce a specific person in a normal routine, then interrupt it with an unexpected problem",
+              "introduce two people doing something ordinary, then let a misunderstanding change the situation",
+              "introduce a character preparing for something important, then reveal one concrete complication",
+              "introduce a person returning home or finishing work, then let them notice something that should not be there",
+              "begin with an ordinary purchase, delivery, repair, game, or task that immediately creates a problem",
+              "begin with a character making a normal decision whose consequence appears within the same opening beat",
+              "begin with a competition or challenge starting normally before one surprising rule or obstacle changes it",
+              "use immediate action only when the first sentence still clearly establishes who the person is and what they were doing",
           ]
 
           TWIST_MODES = [
@@ -242,9 +242,24 @@ jobs:
 
           history = load_history()
           recent = history[-20:]
+          def history_summary(item):
+              fp = item.get("originality_fingerprint", {})
+              if not isinstance(fp, dict):
+                  fp = {}
+              parts = [
+                  str(item.get("title", "")).strip(),
+                  str(item.get("premise", "")).strip(),
+                  str(item.get("setting", "")).strip(),
+                  str(fp.get("conflict", "")).strip(),
+                  str(fp.get("relationship", "")).strip(),
+                  str(fp.get("central_object", "")).strip(),
+                  str(fp.get("twist", "")).strip(),
+                  str(fp.get("ending", "")).strip(),
+              ]
+              return " | ".join(part for part in parts if part)
+
           recent_text = "\n".join(
-              f"- {x.get('title','')} | {x.get('premise','')} | {x.get('setting','')}"
-              for x in recent
+              f"- {history_summary(x)}" for x in recent if history_summary(x)
           ) or "NONE"
 
           last_call = 0.0
@@ -268,6 +283,37 @@ jobs:
                           "required": ["name", "age", "role", "visual_identity"],
                           "additionalProperties": False
                       },
+                      "supporting_characters": {
+                          "type": "array",
+                          "items": {
+                              "type": "object",
+                              "properties": {
+                                  "name": {"type": "string"},
+                                  "role": {"type": "string"},
+                                  "visual_identity": {"type": "string"}
+                              },
+                              "required": ["name", "role", "visual_identity"],
+                              "additionalProperties": False
+                          }
+                      },
+                      "originality_fingerprint": {
+                          "type": "object",
+                          "properties": {
+                              "premise": {"type": "string"},
+                              "conflict": {"type": "string"},
+                              "relationship": {"type": "string"},
+                              "central_object": {"type": "string"},
+                              "escalation": {"type": "string"},
+                              "twist": {"type": "string"},
+                              "ending": {"type": "string"},
+                              "emotional_flavor": {"type": "string"}
+                          },
+                          "required": [
+                              "premise", "conflict", "relationship", "central_object",
+                              "escalation", "twist", "ending", "emotional_flavor"
+                          ],
+                          "additionalProperties": False
+                      },
                       "setting": {"type": "string"},
                       "scenes": {
                           "type": "array",
@@ -288,7 +334,11 @@ jobs:
                           }
                       }
                   },
-                  "required": ["title", "hook", "description", "protagonist", "setting", "scenes"],
+                  "required": [
+                      "title", "hook", "description", "protagonist",
+                      "supporting_characters", "originality_fingerprint",
+                      "setting", "scenes"
+                  ],
                   "additionalProperties": False
               }
           }
@@ -479,6 +529,7 @@ jobs:
 
               required = [
                   "title", "hook", "description", "protagonist",
+                  "supporting_characters", "originality_fingerprint",
                   "setting", "scenes"
               ]
               for k in required:
@@ -503,6 +554,33 @@ jobs:
               role = str(protagonist.get("role", "")).strip()
               if len(role.split()) < 2:
                   return "Protagonist role needs at least 2 words."
+
+              supporting = story["supporting_characters"]
+              if not isinstance(supporting, list) or len(supporting) > 2:
+                  return "supporting_characters must contain at most 2 important characters."
+
+              seen_names = {str(protagonist.get("name", "")).strip().lower()}
+              for i, character in enumerate(supporting, 1):
+                  if not isinstance(character, dict):
+                      return f"Supporting character {i} is not an object."
+                  name = str(character.get("name", "")).strip()
+                  support_role = str(character.get("role", "")).strip()
+                  identity = str(character.get("visual_identity", "")).strip()
+                  if not name or not support_role or len(identity.split()) < 8:
+                      return f"Supporting character {i} needs name, role, and a concrete visual identity."
+                  if name.lower() in seen_names:
+                      return f"Supporting character {i} duplicates an existing character name."
+                  seen_names.add(name.lower())
+
+              fingerprint = story["originality_fingerprint"]
+              if not isinstance(fingerprint, dict):
+                  return "originality_fingerprint must be an object."
+              for key in [
+                  "premise", "conflict", "relationship", "central_object",
+                  "escalation", "twist", "ending", "emotional_flavor"
+              ]:
+                  if not str(fingerprint.get(key, "")).strip():
+                      return f"Missing originality fingerprint field: {key}"
 
               scenes = story["scenes"]
               if not isinstance(scenes, list):
@@ -532,8 +610,16 @@ jobs:
                       return f"Scene {i} narration must be exactly one simple sentence."
 
                   visual = str(scene.get("visual_prompt", "")).strip()
-                  if len(visual.split()) < 8:
+                  if len(visual.split()) < 20:
                       return f"Scene {i} visual prompt is too short."
+
+                  for label in [
+                      "SCENE:", "PRIMARY VISUAL SUBJECT:", "ON-SCREEN CHARACTERS:",
+                      "ACTION:", "LOCATION:", "MOOD:", "CAMERA:", "LIGHTING:",
+                      "CONTINUITY:", "VISUAL DIFFERENTIATION:"
+                  ]:
+                      if label not in visual:
+                          return f"Scene {i} visual prompt is missing {label}"
 
               if total < MIN_WORDS:
                   return f"Story is too short at {total} words; minimum {MIN_WORDS}."
@@ -635,41 +721,28 @@ jobs:
                     - Avoid scenes based only on thoughts, narration, or invisible emotions.
 
                     CHARACTER BIBLE — LOCK IT
-                    Create a highly distinctive protagonist with an exact repeatable visual identity:
-                    age, gender presentation, face shape, eye shape/color, eyebrow shape, hairstyle, hair color, skin tone, body build, height impression,
-                    signature outfit, exact main clothing colors, shoes, and ONE distinctive accessory/prop.
-                    The visual_identity must be concrete and stable enough for an image model to repeat.
-                    Once established, NEVER change those identity traits between scenes. No random hairstyle changes, no different jacket, no different body shape,
-                    no age drift, no changing colors, no disappearing accessory.
-                    Wardrobe must remain tasteful, age-appropriate, everyday, and family-friendly: no micro-shorts, underwear-like bottoms, transparent clothing,
-                    extreme cutouts, deep plunging necklines, lingerie-like outfits, or clothing designed to sexualize the character. Prefer practical casual clothes,
-                    jeans or full-length trousers, knee-length or longer skirts/dresses, hoodies, sweaters, jackets, shirts, sneakers, boots, and similar normal outfits.
-                    If a supporting character returns, keep that character visually identical too and describe the returning details again inside the scene visual prompt.
-
-                    MASTER VISUAL UNIVERSE
-                    Every generated image must look as though the SAME professional 2D cartoon artist illustrated the entire series.
-                    Use this exact art direction in every scene:
-                    premium cinematic hand-drawn 2D cartoon illustration; expressive stylized human characters; slightly exaggerated but believable anatomy;
-                    large highly expressive eyes; strong readable eyebrows and mouths; distinctive facial shapes; clean confident dark ink outlines with varied line weight;
-                    painterly digital coloring; subtle cel shading; soft tonal gradients; gentle textured brushwork; rich but slightly muted cinematic colors;
-                    natural warm/cool color harmony; detailed believable environments; accurate perspective; strong foreground/midground/background depth;
-                    atmospheric lighting; realistic cast and contact shadows; cinematic composition; polished storytelling detail; charming, slightly gritty, premium entertainment look.
-                    Never drift into photorealism, 3D CGI, anime, manga, chibi, flat vector, preschool art, generic AI cartoon art, or clip-art. Preserve the same linework, proportions, palette, shading, facial design, and rendering quality across scenes.
+                    Create one distinctive adult protagonist plus only the supporting characters who genuinely matter, maximum two.
+                    For every recurring character, define a compact repeatable visual identity containing face shape, eyes, eyebrows, hairstyle/color, skin tone,
+                    body build/height impression, exact clothing silhouette/colors, footwear, and one distinctive accessory when useful.
+                    Keep identities tasteful, practical, family-friendly, and unchanged across scenes. Do not reuse one named character's face, body, outfit, or colors for another.
+                    Put recurring supporting characters in supporting_characters once. Scene blueprints should use exact character names rather than rewriting full identities.
+                    The production image stage already injects the fixed master art style, so DO NOT spend visual_prompt tokens repeating art-style, rendering, palette,
+                    linework, shading, or negative-style instructions. Spend those tokens on staging, action, continuity, and story clarity.
 
                     SCENE-TO-IMAGE CONTRACT
-                    For every scene, create the visual_prompt using these exact labeled fields in this order:
-                    SCENE: [specific single frozen moment that can be understood without narration]
-                    PRIMARY VISUAL SUBJECT: [the ONE person or object the camera is mainly following in this scene]
-                    ON-SCREEN CHARACTERS: [list EVERY named or story-relevant character who must physically appear in the frame, with a short unique visual identity for each; do not omit a person merely because the protagonist is easier to draw]
-                    CHARACTER: [full locked protagonist identity when the protagonist is present; if the primary subject is a supporting character, put that character's full locked identity first]
-                    ACTION: [one dominant physical action and exactly who is doing it, receiving it, watching it, or reacting to it]
-                    LOCATION: [specific environment plus important objects]
-                    MOOD: [emotion and atmosphere expressed visually]
-                    CAMERA: [shot size, camera height, angle, lens feel, composition and whose face/body has visual priority]
-                    LIGHTING: [key light, color temperature, time/weather, shadows]
-                    CONTINUITY: [exact clothing/prop/appearance details that must match earlier scenes for EVERY returning character and important object]
-                    VISUAL DIFFERENTIATION: [what visibly changes from the previous scene: subject, location, camera, action, character interaction, prop state, or composition]
-                    Each scene must be a genuinely new visual beat, not another portrait of the same character in the same location. Character identity stays locked, but framing, subject, interaction, environment, action, and composition must change when the story changes. Keep the visual_prompt specific to the scene; do not repeat the MASTER VISUAL UNIVERSE or lengthy style prose inside every scene.
+                    For every scene, create one COMPACT visual_prompt using these exact labeled fields in this order:
+                    SCENE: [one specific frozen story moment]
+                    PRIMARY VISUAL SUBJECT: [the ONE person or object the camera follows]
+                    ON-SCREEN CHARACTERS: [every named character physically present, by exact name; write NONE when no named person is visible]
+                    ACTION: [one dominant visible action, including giver/receiver/reactor when relevant]
+                    LOCATION: [specific environment and only story-relevant objects]
+                    MOOD: [short visible emotional atmosphere]
+                    CAMERA: [shot size, height/angle, composition, and visual priority]
+                    LIGHTING: [time/source/temperature/shadows in compact form]
+                    CONTINUITY: [prop state, clothing state, positions, ownership, damage, wetness, dirt, or other facts that must carry between scenes]
+                    VISUAL DIFFERENTIATION: [the main visible change from the previous scene]
+                    Keep each blueprint concise and production-ready. Do not repeat the master art style or full character bible inside visual_prompt.
+                    Each scene must be a genuinely new visual beat, not another portrait of the same character in the same location. Character identity stays locked, but framing, subject, interaction, environment, action, and composition must change when the story changes.
                     If narration mentions a second character performing an action, receiving an object, being called, arriving, speaking, chasing, warning, passing something, or becoming the reason for the scene, that character MUST be visible and visually important in that scene unless the story intentionally withholds them as a mystery.
                     If two characters interact, show the interaction itself; do not replace the second character with the protagonist alone.
 
@@ -699,7 +772,7 @@ jobs:
                     {recent_text}
 
                     FINAL SELF-CHECK
-                    Before returning JSON, silently verify: strong natural opening; clear goal/problem; causal scene progression; at least one setback/reversal; earned payoff; material difference from recent history; distinct characters and visuals; natural storyteller voice. Delete filler and repetition.
+                    Before returning JSON, silently verify: strong immediate hook; active protagonist; clear goal/problem; every scene changes the situation; at least one setback/reversal; earned payoff; material difference from recent history; consistent character/art style; natural storyteller voice; every scene visually filmable. Delete filler and repetition.
 
                     OUTPUT CONTRACT
                     Return ONLY this top-level JSON object and nothing else:
@@ -713,12 +786,29 @@ jobs:
                         "role": "specific role with at least two words",
                         "visual_identity": "exact face shape, eye description, hairstyle, hair color, skin tone, body build, outfit colors, footwear, distinctive accessory"
                       }},
+                      "supporting_characters": [
+                        {{
+                          "name": "important supporting character",
+                          "role": "story role",
+                          "visual_identity": "compact distinct locked identity"
+                        }}
+                      ],
+                      "originality_fingerprint": {{
+                        "premise": "short substantive premise",
+                        "conflict": "main conflict type",
+                        "relationship": "central relationship dynamic or none",
+                        "central_object": "important object or none",
+                        "escalation": "what makes the problem worsen",
+                        "twist": "actual reversal mechanism",
+                        "ending": "actual payoff mechanism",
+                        "emotional_flavor": "dominant emotional flavor"
+                      }},
                       "setting": "specific physical setting",
                       "scenes": [
                         {{
                           "scene": 1,
                           "narration": "one natural spoken sentence, 12-26 words",
-                          "visual_prompt": "SCENE: ... PRIMARY VISUAL SUBJECT: ... ON-SCREEN CHARACTERS: ... CHARACTER: ... ACTION: ... LOCATION: ... MOOD: ... CAMERA: ... LIGHTING: ... CONTINUITY: ... VISUAL DIFFERENTIATION: ..."
+                          "visual_prompt": "SCENE: ... PRIMARY VISUAL SUBJECT: ... ON-SCREEN CHARACTERS: ... ACTION: ... LOCATION: ... MOOD: ... CAMERA: ... LIGHTING: ... CONTINUITY: ... VISUAL DIFFERENTIATION: ..."
                         }}
                       ]
                     }}
@@ -726,7 +816,6 @@ jobs:
                     SCENE CONTRACT
                     - Plan 8-10 scenes when practical; never fewer than 7 or more than 16, and never pad with filler.
                     - Target 17-21 narration words per scene; hard range 12-26. Count every scene before returning.
-                    - Keep each visual_prompt detailed but compact, normally about 45-80 words; do not repeat the full art-style prose inside each scene.
                     - Total narration 170-230 words without filler.
                     - Every narration is exactly ONE natural spoken sentence.
                     - Scene 1: naturally introduce the protagonist in the middle of an ordinary or unusual action, then immediately reveal the problem, interruption, clue, risk, or question that makes the viewer need the next scene.
@@ -770,7 +859,9 @@ jobs:
 
                     HARD CHECKS:
                     - 7-16 scenes; prefer 8-10; never add filler.
+                    - Keep protagonist, supporting_characters, and originality_fingerprint present and internally consistent.
                     - Every scene has scene, narration, visual_prompt.
+                    - Every visual_prompt contains all 10 required labels exactly: SCENE, PRIMARY VISUAL SUBJECT, ON-SCREEN CHARACTERS, ACTION, LOCATION, MOOD, CAMERA, LIGHTING, CONTINUITY, VISUAL DIFFERENTIATION.
                     - Narration: exactly ONE natural spoken sentence, 12-26 words, target 17-21.
                     - Total narration MUST be at least 170 words and at most 230 words. Before returning JSON, count all scene narration words. If the total is below 170, expand the existing scenes naturally until it is at least 170; never return an under-170 story.
                     - Total narration target: 180-210 words when practical, without filler.
@@ -929,15 +1020,50 @@ jobs:
                   f"Pollinations image generation failed for {path.name}: {last_error}"
               )
 
+          VISUAL_LABELS = [
+              "SCENE", "PRIMARY VISUAL SUBJECT", "ON-SCREEN CHARACTERS", "ACTION",
+              "LOCATION", "MOOD", "CAMERA", "LIGHTING", "CONTINUITY",
+              "VISUAL DIFFERENTIATION"
+          ]
+
+          def visual_field(blueprint, label):
+              label_group = "|".join(re.escape(x) for x in VISUAL_LABELS)
+              match = re.search(
+                  rf"(?:^|\s){re.escape(label)}\s*:\s*(.*?)(?=\s+(?:{label_group})\s*:|$)",
+                  str(blueprint).strip(),
+                  flags=re.IGNORECASE | re.DOTALL,
+              )
+              return match.group(1).strip() if match else ""
+
           for index, scene in enumerate(story["scenes"], 1):
               output = IMAGES / f"scene_{index:02d}.png"
-              visual_anchor = (
-                  f"CHARACTER LOCK — {story['protagonist']['name']}; age {story['protagonist']['age']}; "
-                  f"role {story['protagonist']['role']}; EXACT IDENTITY: {story['protagonist']['visual_identity']}. "
-                  "Repeat these identity traits exactly in this image: same face shape, same eyes, same eyebrows, same hair, same skin tone, "
-                  "same body build, same clothing design and exact clothing colors, same shoes, same distinctive accessory. "
-                  "Do not redesign or reinterpret the character. "
-              )
+              on_screen = visual_field(scene["visual_prompt"], "ON-SCREEN CHARACTERS")
+              on_screen_lower = on_screen.lower()
+
+              character_locks = []
+              protagonist = story["protagonist"]
+              protagonist_name = str(protagonist["name"]).strip()
+              if protagonist_name.lower() in on_screen_lower:
+                  character_locks.append(
+                      f"CHARACTER LOCK — {protagonist_name}; age {protagonist['age']}; "
+                      f"role {protagonist['role']}; EXACT IDENTITY: {protagonist['visual_identity']}. "
+                      "Preserve this identity exactly; do not redesign the face, hair, body, outfit colors, footwear, or accessory. "
+                  )
+              else:
+                  character_locks.append(
+                      f"ABSENCE LOCK — {protagonist_name} is NOT listed in ON-SCREEN CHARACTERS for this scene, "
+                      "so do not insert the protagonist into the frame. "
+                  )
+
+              for support in story.get("supporting_characters", []):
+                  support_name = str(support.get("name", "")).strip()
+                  if support_name and support_name.lower() in on_screen_lower:
+                      character_locks.append(
+                          f"SUPPORTING CHARACTER LOCK — {support_name}; role {support['role']}; "
+                          f"EXACT IDENTITY: {support['visual_identity']}. Preserve this identity exactly. "
+                      )
+
+              visual_anchor = "".join(character_locks)
 
               MASTER_STYLE = (
                   "MASTER STYLE — premium cinematic hand-drawn 2D cartoon illustration in one consistent visual universe; "
@@ -952,11 +1078,9 @@ jobs:
               )
 
               CONTINUITY_RULES = (
-                  "CONTINUITY LOCK — this is the SAME recurring character from the previous and next scenes. "
-                  "Preserve exact face shape, eye shape and color, eyebrows, hairstyle, hair color, skin tone, age, body proportions, clothing silhouette, "
-                  "exact garment colors, shoes and signature accessory. Keep left-right relationships and prop ownership consistent. "
-                  "If a returning supporting character is described in this scene, preserve that character's earlier appearance exactly. "
-                  "Do not invent a new outfit, haircut, body type, accessory, age, facial structure, or color palette. "
+                  "CONTINUITY LOCK — preserve every ON-SCREEN named character according to the explicit character locks above. "
+                  "Preserve prop ownership, prop condition, clothing state, left-right relationships, environmental continuity, and story-relevant changes "
+                  "specified by the scene blueprint. Do not invent unrequested named characters or duplicate any named person. "
               )
 
               prompt = (
@@ -1197,6 +1321,7 @@ jobs:
               "title": story["title"],
               "premise": story["hook"],
               "setting": story["setting"],
+              "originality_fingerprint": story["originality_fingerprint"],
               "words": words(script),
               "scenes": len(story["scenes"]),
               "created_utc": time.strftime(
