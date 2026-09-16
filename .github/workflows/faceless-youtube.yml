@@ -736,8 +736,8 @@ jobs:
                     SCENE CONTRACT
                     - Produce 8-10 scenes; prefer 8 when sufficient; use 9-10 only when each adds genuine progression. Never pad.
                     - Target 18-22 narration words/scene; hard range 12-26.
-                    - Target 185-205 total narration words so the first generation comfortably clears validation.
-                    - If total is below 170, enrich existing scenes with useful cause/consequence/reaction/detail; do NOT add filler.
+                    - Target 190-210 total narration words so the first generation has a safe buffer above the hard minimum.
+                    - Never deliberately target the minimum. Before returning JSON, silently count total narration words and prefer 190-210; if the draft is short, enrich existing scenes with useful cause/consequence/reaction/detail rather than stopping early.
                     - Every narration is exactly ONE natural spoken sentence.
                     - Scene 1: natural character introduction + immediate specific disruption/question.
                     - Scene 2: problem becomes concrete. Scene 3: goal/risk/choice becomes clear.
@@ -767,9 +767,8 @@ jobs:
 
                   print(f"[validator] {issue}", flush=True)
 
-                  # Token-saving fast path: a small total-word-count miss is a
-                  # mechanical formatting issue, not a creative-writing failure.
-                  # Fix it locally instead of spending another full LLM request.
+                  # Token-saving fast path: total-word-count misses are mechanical, not creative failures.
+                  # Fix any shortfall up to 24 words locally, with exact word-count clauses, before considering an LLM repair.
                   short_match = re.fullmatch(
                       r"Story is too short at (\d+) words; minimum (\d+)\.",
                       issue,
@@ -779,36 +778,50 @@ jobs:
                       minimum_words = int(short_match.group(2))
                       shortfall = minimum_words - current_words
 
-                      if 1 <= shortfall <= 12:
-                          padding_options = [
-                              " making the next step harder than it first seemed",
-                              " and the situation suddenly became harder to control",
-                              " while the consequences became impossible to ignore",
-                              " and that small change created a bigger problem",
-                              " as the next decision became much more important",
-                          ]
+                      # Root prevention: the writer should target 190-210, but if it still lands short,
+                      # deterministic code repairs the count without rewriting the story or consuming tokens.
+                      EXACT_CAUSAL_CLAUSES = {
+                          1: " again",
+                          2: " from then",
+                          3: " from that moment",
+                          4: " and pressure rose",
+                          5: " and the pressure rose",
+                          6: " and the pressure suddenly rose",
+                          7: " and the pressure suddenly rose again",
+                          8: " and the final choice became harder",
+                          9: " and the final choice became harder to avoid",
+                          10: " and the final choice became even harder to avoid",
+                          11: " and the next decision suddenly became much harder",
+                          12: " and the next decision suddenly became much harder to make",
+                          13: " and the next decision suddenly became much harder than expected",
+                          14: " and the next decision suddenly became much harder than anyone expected",
+                          15: " and the next decision suddenly became harder than anyone expected at first",
+                          16: " and the next decision suddenly became much harder than anyone expected at first",
+                          17: " and the next decision suddenly became much harder than anyone had expected at first",
+                          18: " and the next decision suddenly became much harder than anyone could have expected",
+                          19: " and the next decision suddenly became much harder than anyone could have reasonably expected",
+                          20: " and the next decision suddenly became much harder than anyone could have reasonably expected before",
+                          21: " and the next decision suddenly became much harder than anyone could have reasonably expected before then",
+                          22: " and the next decision suddenly became much harder than anyone could have reasonably expected at that moment",
+                          23: " and the next decision suddenly became much harder than anyone could have reasonably expected in that exact moment",
+                          24: " and the next decision suddenly became much harder than anyone could have reasonably expected in that exact situation",
+                      }
 
-                          # Add a short, story-neutral causal clause to the
-                          # scene that is closest to the climax/payoff. This
-                          # preserves the existing premise instead of asking the
-                          # model to rewrite the whole story.
-                          target = story.get("scenes", [])[-1]
+                      if 1 <= shortfall <= 24 and story.get("scenes"):
+                          target = story["scenes"][-1]
                           narration = str(target.get("narration", "")).strip()
-                          if narration:
-                              clause = padding_options[(current_words + shortfall) % len(padding_options)]
-                              base = narration.rstrip(".!? ")
-                              candidate = base + clause + "."
-                              added = words(candidate) - words(narration)
-                              if added == shortfall or (added < shortfall and shortfall - added <= 3):
-                                  target["narration"] = candidate
-                                  normalize_story_narrations(story)
-                                  issue = validate_story(story)
-                                  if not issue:
-                                      print(
-                                          f"[validator] fixed minor {shortfall}-word shortfall locally; no repair call used.",
-                                          flush=True,
-                                      )
-                                      return story
+                          clause = EXACT_CAUSAL_CLAUSES[shortfall]
+                          candidate = narration.rstrip(".!? ") + clause + "."
+                          if words(candidate) - words(narration) == shortfall:
+                              target["narration"] = candidate
+                              normalize_story_narrations(story)
+                              issue = validate_story(story)
+                              if not issue:
+                                  print(
+                                      f"[validator] fixed {shortfall}-word shortfall locally; no repair call used.",
+                                      flush=True,
+                                  )
+                                  return story
 
                   repair_prompt = f"""
                     Perform a MINIMAL repair of the SAME story.
