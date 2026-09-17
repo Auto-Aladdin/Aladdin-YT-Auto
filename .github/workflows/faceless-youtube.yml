@@ -26,6 +26,7 @@ jobs:
         env:
           GROQ_API_KEY: ${{ secrets.GROQ_API_KEY }}
           POLLINATIONS_API_KEY: ${{ secrets.POLLINATIONS_API_KEY }}
+          POLLINATIONS_API_KEY_2: ${{ secrets.POLLINATIONS_API_KEY_2 }}
         run: |
           set -euo pipefail
           python3 -u - <<'PY'
@@ -731,7 +732,7 @@ jobs:
               for call_number in range(1, MAX_STORY_CALLS + 1):
                   story = groq_json(
                       prompt,
-                      max_tokens=4000,
+                      max_tokens=3000,
                       temperature=0.65,
                       label=f"story-{call_number}",
                       response_schema=STORY_SCHEMA,
@@ -956,70 +957,110 @@ jobs:
               )
 
           POLLINATIONS_BASE = "https://gen.pollinations.ai/image/"
+          POLLINATIONS_ACCOUNT_BASE = "https://gen.pollinations.ai/account/"
+
+          POLLINATIONS_KEY_1 = os.environ["POLLINATIONS_API_KEY"]
+          POLLINATIONS_KEY_2 = os.environ.get("POLLINATIONS_API_KEY_2", "").strip()
+          ACTIVE_POLLINATIONS_KEY = None
+          POLLINATIONS_MIN_BALANCE = 0.0020
+
+          def pollinations_balance(key, label):
+              if not key:
+                  return None
+              try:
+                  req = urllib.request.Request(
+                      POLLINATIONS_ACCOUNT_BASE + "balance",
+                      headers={
+                          "Authorization": f"Bearer {key}",
+                          "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V3",
+                          "Accept": "application/json",
+                      },
+                      method="GET",
+                  )
+                  with urllib.request.urlopen(req, timeout=30) as r:
+                      payload = json.loads(r.read().decode("utf-8"))
+                  balance = float(payload.get("balance", 0.0))
+                  print(f"[image] {label} Pollinations balance: {balance:.6f} pollen", flush=True)
+                  return balance
+              except urllib.error.HTTPError as exc:
+                  raw = exc.read().decode("utf-8", errors="replace")
+                  print(f"[image] {label} balance check HTTP {exc.code}: {raw[:500]}", flush=True)
+                  return None
+              except Exception as exc:
+                  print(f"[image] {label} balance check failed: {exc}", flush=True)
+                  return None
+
+          def select_pollinations_key(required_pollen=POLLINATIONS_MIN_BALANCE):
+              global ACTIVE_POLLINATIONS_KEY
+              balance_1 = pollinations_balance(POLLINATIONS_KEY_1, "API 1")
+              if balance_1 is not None and balance_1 >= required_pollen:
+                  ACTIVE_POLLINATIONS_KEY = POLLINATIONS_KEY_1
+                  print("[image] using Pollinations API 1", flush=True)
+                  return ACTIVE_POLLINATIONS_KEY
+
+              if balance_1 is not None:
+                  print(f"[image] API 1 insufficient for next image (need ~{required_pollen:.4f}).", flush=True)
+              else:
+                  print("[image] API 1 balance could not be verified.", flush=True)
+
+              balance_2 = pollinations_balance(POLLINATIONS_KEY_2, "API 2")
+              if balance_2 is not None and balance_2 >= required_pollen:
+                  ACTIVE_POLLINATIONS_KEY = POLLINATIONS_KEY_2
+                  print("[image] using Pollinations API 2", flush=True)
+                  return ACTIVE_POLLINATIONS_KEY
+
+              if not POLLINATIONS_KEY_2:
+                  raise RuntimeError("Pollinations API 1 has insufficient pollen and POLLINATIONS_API_KEY_2 is not configured.")
+              if balance_2 is None:
+                  raise RuntimeError("Pollinations API 1 has insufficient pollen and API 2 balance could not be verified.")
+              raise RuntimeError(f"Neither Pollinations API has enough pollen (API 1={balance_1 if balance_1 is not None else 'unknown'}, API 2={balance_2:.6f}).")
 
           def download_image(url, path, timeout=120):
+              global ACTIVE_POLLINATIONS_KEY
               last_error = None
-              for attempt in range(1, 4):
-                  try:
-                      req = urllib.request.Request(
-                          url,
-                          headers={
-                              "Authorization": f"Bearer {POLLINATIONS_KEY}",
-                              "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V3",
-                              "Accept": "image/png,image/jpeg,image/webp,image/*",
-                          },
-                          method="GET",
-                      )
-                      with urllib.request.urlopen(req, timeout=timeout) as r:
-                          data = r.read()
-                          content_type = (r.headers.get("Content-Type") or "").lower()
-
-                      if len(data) < 10000:
-                          raise RuntimeError(
-                              f"Image response for {path.name} is suspiciously small ({len(data)} bytes)."
+              for provider_attempt in range(1, 3):
+                  if ACTIVE_POLLINATIONS_KEY is None:
+                      select_pollinations_key()
+                  for attempt in range(1, 4):
+                      try:
+                          req = urllib.request.Request(
+                              url,
+                              headers={
+                                  "Authorization": f"Bearer {ACTIVE_POLLINATIONS_KEY}",
+                                  "User-Agent": "Aladdin-YT-Auto/ShortsFactory-V3",
+                                  "Accept": "image/png,image/jpeg,image/webp,image/*",
+                              },
+                              method="GET",
                           )
-
-                      valid_magic = (
-                          data.startswith(b"\x89PNG")
-                          or data.startswith(b"\xff\xd8")
-                          or data.startswith(b"RIFF")
-                      )
-                      if "image" not in content_type and not valid_magic:
-                          preview = data[:160].decode("utf-8", errors="replace")
-                          raise RuntimeError(
-                              f"Image response for {path.name} is not an image "
-                              f"(Content-Type: {content_type}, body starts: {preview!r})."
-                          )
-
-                      path.write_bytes(data)
-                      print(
-                          f"[image] saved {path.name} ({len(data)/1024:.1f} KiB)",
-                          flush=True,
-                      )
-                      return
-
-                  except urllib.error.HTTPError as exc:
-                      raw = exc.read().decode("utf-8", errors="replace")
-                      last_error = RuntimeError(
-                          f"HTTP {exc.code}: {raw[:1200]}"
-                      )
-                      print(
-                          f"[image] attempt {attempt}/3 HTTP {exc.code} for {path.name}",
-                          flush=True,
-                      )
-                  except Exception as exc:
-                      last_error = exc
-                      print(
-                          f"[image] attempt {attempt}/3 failed for {path.name}: {exc}",
-                          flush=True,
-                      )
-
-                  if attempt < 3:
-                      time.sleep(2 * attempt)
-
-              raise RuntimeError(
-                  f"Pollinations image generation failed for {path.name}: {last_error}"
-              )
+                          with urllib.request.urlopen(req, timeout=timeout) as r:
+                              data = r.read()
+                              content_type = (r.headers.get("Content-Type") or "").lower()
+                          if len(data) < 10000:
+                              raise RuntimeError(f"Image response for {path.name} is suspiciously small ({len(data)} bytes).")
+                          valid_magic = data.startswith(b"\x89PNG") or data.startswith(b"\xff\xd8") or data.startswith(b"RIFF")
+                          if "image" not in content_type and not valid_magic:
+                              preview = data[:160].decode("utf-8", errors="replace")
+                              raise RuntimeError(f"Image response for {path.name} is not an image (Content-Type: {content_type}, body starts: {preview!r}).")
+                          path.write_bytes(data)
+                          print(f"[image] saved {path.name} ({len(data)/1024:.1f} KiB)", flush=True)
+                          return
+                      except urllib.error.HTTPError as exc:
+                          raw = exc.read().decode("utf-8", errors="replace")
+                          last_error = RuntimeError(f"HTTP {exc.code}: {raw[:1200]}")
+                          print(f"[image] attempt {attempt}/3 HTTP {exc.code} for {path.name}", flush=True)
+                          if exc.code == 402 and provider_attempt == 1:
+                              print("[image] API 1 returned 402; switching to API 2 after balance check.", flush=True)
+                              ACTIVE_POLLINATIONS_KEY = None
+                              select_pollinations_key()
+                              break
+                      except Exception as exc:
+                          last_error = exc
+                          print(f"[image] attempt {attempt}/3 failed for {path.name}: {exc}", flush=True)
+                      if attempt < 3:
+                          time.sleep(2 * attempt)
+                  else:
+                      break
+              raise RuntimeError(f"Pollinations image generation failed for {path.name}: {last_error}")
 
           for index, scene in enumerate(story["scenes"], 1):
               output = IMAGES / f"scene_{index:02d}.png"
