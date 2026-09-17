@@ -1140,40 +1140,43 @@ jobs:
               if seed <= 0:
                   seed = 1
 
+              # Build the image prompt around the story event first.  This is a
+              # prompt-only correction: generation, API flow, seeds, continuity,
+              # style, and all downstream pipeline logic remain unchanged.
               prompt = (
-                  MASTER_STYLE
-                  + visual_anchor
-                  + CONTINUITY_RULES
-                  + " MANDATORY SCENE OVERRIDE — depict ONLY the exact scene-specific event below. "
-                    "This is NOT a generic protagonist portrait and NOT a collage of story elements. Before rendering, internally "
-                    "decompose the narration into actor, primary physical action, object/person affected, location, visible state change, "
-                    "reaction, and consequence. Identify the single true visual owner and the most information-dense freeze-frame that "
-                    "proves the beat. The primary physical action must be visibly occurring whenever it is representable. If the narration "
-                    "says unlock, show the key entering/turning in the lock; if it says grab, show the hand actually grasping; if it says "
-                    "drop and run, show the dropped object in motion/position plus the character's directional movement when one frame can "
-                    "communicate both; if it says notice/read/examine, show the character visibly attending to the relevant clue/object. "
-                    "When the protagonist is required on screen, make them an ACTIVE visual subject: show the exact story-driven action they "
-                    "are performing, their visible emotion and body language, what they are reacting to or interacting with, and the "
-                    "consequence or object that makes the action meaningful. Use an engaging composition and camera distance/angle that "
-                    "clearly communicates that moment. Never replace a narrated action with merely standing, posing, smiling, or looking at "
-                    "camera. Do NOT invent an action, emotion, object, or interaction that is not supported by the narration or scene blueprint. "
-                    "If another person, object, clue, place, or consequence is the true owner of the beat, give it appropriate visual prominence "
-                    "while keeping any required protagonist action and continuity accurate. Do NOT automatically center the protagonist. Do NOT "
-                    "reuse the previous scene's pose, camera, framing, character lineup, or background composition. Camera variation must be "
-                    "chosen to serve the current beat; the supplied shot guidance is secondary and MUST be overridden if it conflicts with the "
-                    "narrated action, visual owner, or physical logic. The exact narration, scene-specific action, supporting characters, props, "
-                    "object state, and location override generic character defaults. "
-                    "SHOT VARIATION — "
-                  + shot_override
-                  + ". NARRATION CONTEXT — "
+                  "SCENE EVENT IS THE SOURCE OF TRUTH — the image must depict what is actually happening in the narration at this exact moment. "
+                  "Do NOT make a generic portrait of the protagonist and do NOT make the protagonist the visual subject unless the narrated beat requires it. "
+                  "Before rendering, silently answer these questions in order: (1) WHAT exact event is happening NOW? (2) WHAT exact physical action is occurring? "
+                  "(3) WHAT object, person, place, or state is being affected? (4) WHO or WHAT is the true visual owner of this beat? (5) WHAT must be visible for a viewer to understand the event with sound muted? "
+                  "(6) WHAT pose, body mechanics, expression, interaction, environment, and camera framing best prove that event? (7) WHAT single freeze-frame captures the clearest causal moment? "
+                  "Then compose the image from those answers. The story event determines the composition; character consistency and art style are applied AFTER the event has been solved. "
+                  "If the narration says someone walks toward a house, visibly show directional walking toward the house rather than a front-facing standing portrait. "
+                  "If someone notices something, show their attention directed toward the actual thing being noticed. If someone kneels and picks something up, show the crouched/kneeling body and hand actually reaching for or holding the object. "
+                  "If someone unlocks or opens a door, show the actual key/hand/lock/door interaction and the door state, not a character standing beside a door. "
+                  "If someone runs, show unmistakable running posture, stride, direction, and environmental context. If two characters speak or interact, show both characters in a readable interaction. "
+                  "If an object, clue, damage, reveal, or environmental change is the important event, let that thing own the frame when appropriate, using the protagonist only as a secondary observer or partial presence when that communicates the beat better. "
+                  "For multi-action narration, choose ONE physically coherent freeze-frame containing the strongest causal information; never create a collage, montage, split-screen, or impossible simultaneous sequence. "
+                  "NEVER substitute standing, posing, smiling, looking at camera, or a generic walking pose for a more specific narrated action. NEVER invent an action, reaction, object, relationship, or event merely to make the picture interesting. "
+                  "NEVER force the protagonist into the foreground, center, or full-body view when the beat is better communicated by an object insert, environmental reveal, over-the-shoulder view, point-of-view view, reaction shot, side action view, or two-character interaction. "
+                  "A front-facing character portrait is acceptable ONLY when the narration itself is fundamentally about that person's visible reaction, expression, or identity at that moment. "
+                  "The final frame must pass this silent-view test: if the narration is muted, a viewer should still be able to identify the specific event or discovery represented by this scene, not merely identify the character. "
+                  "NARRATION — "
                   + scene["narration"]
                   + " SCENE BLUEPRINT — "
                   + scene["visual_prompt"]
-                  + " FINAL SCENE LOCK — the viewer must immediately recognize this as a DIFFERENT STORY BEAT "
-                    "from the previous frame while all returning character designs and art style remain identical. "
-                    "Audit the frame against the narration: every important named person, place, object, clue, action, "
-                    "and visible consequence required for this beat must be represented correctly; omit people not needed. "
-                    "Freeze this exact cinematic moment as the keyframe and make the cause-and-effect understandable with narration muted."
+                  + " COMPOSITION DECISION — select the shot size, angle, camera distance, subject placement, depth, and visual emphasis that most clearly communicates the narrated event. "
+                  "Use close-up/insert for a critical object, clue, hand action, or detail; medium/dynamic framing for physical action; over-the-shoulder or point-of-view for discovery; two-shot for genuine character interaction; environmental/reveal framing when the location or consequence is the event. "
+                  "These are options, not a fixed sequence. Do not choose a shot merely because of scene number. The most accurate event depiction always wins. "
+                  + " OPTIONAL SHOT GUIDANCE — "
+                  + shot_override
+                  + ". This guidance is secondary to the narrated event and must never override it. "
+                  + visual_anchor
+                  + MASTER_STYLE
+                  + CONTINUITY_RULES
+                  + " CHARACTER CONSISTENCY IS IDENTITY ONLY — preserve the established identity, facial characteristics, hairstyle, clothing, proportions, accessories, and art style of returning characters, but freely change pose, body mechanics, camera angle, framing, scale, position, expression, and spatial placement whenever required by the current story beat. "
+                  + " SCENE ACCURACY LOCK — the exact narrated event, physical action, visual owner, affected object/person, object state, location, and visible consequence override generic defaults. "
+                  + " Do not reuse the previous scene's pose, camera, framing, lineup, or composition merely for continuity. Continuity means the same characters and world, not the same staging. "
+                  + " FINAL VISUAL AUDIT — render one coherent cinematic keyframe of THIS exact beat. Verify that the main physical action is visibly happening, the true visual owner is prominent enough to understand, every important object/person needed to explain the beat is visible, the body mechanics make physical sense, and the composition communicates the event with narration muted. If the frame would still read as 'the protagonist standing in a scene' after removing the narration, the composition is wrong; rebuild it around the actual event."
               )
 
               encoded = urllib.parse.quote(prompt, safe="")
