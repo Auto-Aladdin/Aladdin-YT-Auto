@@ -262,9 +262,11 @@ jobs:
               GROQ_USAGE_FILE.write_text(json.dumps(state, indent=2), encoding="utf-8")
 
           history = load_history()
-          recent = history[-20:]
+          recent = history[-12:]
           recent_text = "\n".join(
-              f"- {x.get('title','')} | {x.get('premise','')} | {x.get('setting','')}"
+              f"- {str(x.get('title','')).strip()[:90]} | "
+              f"{str(x.get('premise','')).strip()[:180]} | "
+              f"{str(x.get('setting','')).strip()[:90]}"
               for x in recent
           ) or "NONE"
 
@@ -676,7 +678,7 @@ jobs:
 
               OPENING HOOK: Scene 1 must orient the viewer before escalating. In natural spoken English, quickly establish WHO the main person is, WHERE or WHAT ordinary situation they are in, and ONE specific change/problem/detail that makes us want the next scene. The opening may use the person's name, job, routine, relationship, possession, or immediate task when useful. Vary the sentence structure every story; do NOT repeatedly start with "There was...", "One day...", "Meet...", or the same formula. Prefer concrete human details over vague mystery language. The hook must promise only what the story actually delivers.
 
-              NARRATION: Natural, simple spoken English that is easy to follow on first listen. One sentence per scene. Each sentence must advance cause-and-effect with new story information, clue, emotion, decision, or consequence; do not merely describe the picture. Target 18–22 words per scene and 190–210 total words across EXACTLY 8 scenes. You MUST generate all 8 scenes, numbered 1 through 8, before ending the JSON. Never stop at 7 scenes. Never generate fewer than 8 scenes. Scene 8 must contain the final consequence and earned payoff. Avoid awkward punctuation, broken names, poetic filler, and confusing pronouns.
+              NARRATION: Natural, simple spoken English; one sentence per scene. Every sentence advances cause-and-effect with new information, a clue, emotion, decision, or consequence. Target 23–25 words per scene and 190–200 total words across EXACTLY 8 scenes. This target is deliberate: keep every scene safely below the 27-word validator ceiling while preserving enough detail for a strong voiceover. Generate all 8 scenes, numbered 1–8; never stop early. Scene 8 must contain the final consequence and earned payoff. Avoid filler, awkward punctuation, broken names, and confusing pronouns.
 
               CHARACTER CONSISTENCY: Create one specific adult protagonist with fixed age, name, role, face, eyes, brows, hair, skin tone, build, outfit/colors, shoes, and ONE signature accessory. Lock those traits for every scene in THIS story. If the protagonist happens to be a recurring named character such as Alina, preserve the same established identity rather than redesigning her. Do not force the same protagonist name into every new story unless the premise naturally calls for a recurring character. Give important supporting characters a small but distinctive visual identity on first appearance (for example age range, hair, clothing color, glasses, uniform, or other stable feature) and repeat those identifying traits whenever they reappear.
 
@@ -726,7 +728,7 @@ jobs:
               RECENT STORIES:
               {recent_text}
 
-              Return ONLY valid JSON matching the schema. Silently check: opening orientation + hook, originality against recent stories, clear cause-and-effect, natural narration, 190–210 words, EXACTLY 8 scenes numbered 1 through 8, locked protagonist/supporting-character continuity, exact narration-to-scene correspondence, varied visual ownership, accurate SEO title/description, policy-safe content, and an earned ending. Do not return the JSON until scene 8 is present.
+              Return ONLY valid JSON matching the schema. Before returning, verify: clear opening hook, originality, cause-and-effect, 190–200 narration words, EXACTLY 8 scenes numbered 1–8, every scene 23–25 words when practical and never over 27, continuity, narration-to-visual match, varied visual ownership, accurate metadata, safety, and an earned ending. Do not return JSON until scene 8 is present.
                         """
 
               for call_number in range(1, MAX_STORY_CALLS + 1):
@@ -808,11 +810,11 @@ jobs:
 
                     Change only what is necessary to satisfy the validator. Do NOT rewrite the premise,
                     characters, setting, hook, visual identity, scene order, visual prompts, or payoff.
-                    Keep 8-10 scenes. Keep every scene as ONE natural spoken sentence.
+                    Keep the existing scene structure. Keep every scene as ONE natural spoken sentence.
 
                     TARGETS:
-                    - 12-26 narration words per scene, target 18-22.
-                    - Total narration 165-230 words, target 190-210.
+                    - Keep each narration scene at 23-25 words when practical; NEVER exceed the existing 27-word maximum.
+                    - Keep total narration at 190-200 words when the issue is word count.
                     - Preserve the same causal story, continuity, tone, and visual plan.
                     - Do not add filler or invent a new plot point just to change word count.
 
